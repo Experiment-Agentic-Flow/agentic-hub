@@ -14,7 +14,7 @@
   "monorepos": [
     {
       "repo": "VJ-Poovin-Organization/mepworkspace",
-      "branch": "main",
+      "branch": "develop",
       "type": "nx"
     }
   ]
