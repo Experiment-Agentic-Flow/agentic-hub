@@ -30,7 +30,18 @@ export async function getFileContent(repo, filePath, ref) {
 export async function getFileTree(repo, ref, prefix = '') {
   const [owner, name] = repo.split('/');
   const client = getOctokit();
-  const { data: refData } = await client.git.getRef({ owner, repo: name, ref: `heads/${ref}` });
+  let refData;
+  try {
+    ({ data: refData } = await client.git.getRef({ owner, repo: name, ref: `heads/${ref}` }));
+  } catch (err) {
+    if (err.status === 404) {
+      throw new Error(
+        `Branch "${ref}" not found on ${repo} (or ORG_GITHUB_PAT can't see this repo - GitHub returns 404 for both). ` +
+          `Verify the branch name in rag-registry.json and that the token has access to ${repo}.`
+      );
+    }
+    throw err;
+  }
   const commitSha = refData.object.sha;
   const { data: commit } = await client.git.getCommit({ owner, repo: name, commit_sha: commitSha });
   const { data: tree } = await client.git.getTree({
