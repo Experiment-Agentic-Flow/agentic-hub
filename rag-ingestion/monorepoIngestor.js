@@ -38,7 +38,11 @@ function installDependencies(repoDir) {
     return false;
   }
   try {
-    const cmd = hasLockfile ? 'npm ci --ignore-scripts --no-audit --no-fund' : 'npm install --ignore-scripts --no-audit --no-fund';
+    // --legacy-peer-deps: we only need node_modules populated enough for `nx graph` to resolve
+    // plugins - we're not building/running the app, so strict peer-dep conflicts don't matter here.
+    const cmd = hasLockfile
+      ? 'npm ci --ignore-scripts --no-audit --no-fund --legacy-peer-deps'
+      : 'npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps';
     execSync(cmd, { cwd: repoDir, stdio: 'pipe' });
     return true;
   } catch (err) {
