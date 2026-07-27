@@ -13,7 +13,7 @@ async function main() {
     TICKET_KEY,
     TICKET_DESCRIPTION,
     TARGET_REPO,
-    TARGET_BRANCH = 'main',
+    TARGET_BRANCH,
     WORKSPACE_DIR = path.resolve('workspace'),
   } = process.env;
 
@@ -103,7 +103,7 @@ correct fix ONLY inside that repository's subfolder. Do not modify files in any 
     }
   }
 
-  const chosenBranch = candidates.find((c) => c.repo === chosenRepo)?.branch || TARGET_BRANCH;
+  const chosenBranch = candidates.find((c) => c.repo === chosenRepo)?.branch || TARGET_BRANCH || 'main';
   const pushed = await commitAndPush(candidateDirs[chosenRepo], branchName, `${result.commitMessage}\n\nFixes ${TICKET_KEY}`);
   if (!pushed) {
     console.log(`No changes were made by the agent in ${chosenRepo}; skipping PR creation.`);

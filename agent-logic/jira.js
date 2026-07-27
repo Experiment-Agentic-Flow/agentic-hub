@@ -54,18 +54,32 @@ function adfToPlainText(node) {
 
 /**
  * Fetches a ticket's summary + description directly from Jira. n8n only forwards the ticket key
- * and type (not the description), so agent-hub fetches the full ticket content itself - this is
- * also what's used as the task text given to the Copilot coding agent.
+ * (not the description or ticket type), so agent-hub fetches the full ticket content itself -
+ * this is also what's used as the task text given to the Copilot coding agent.
  */
 export async function fetchTicketDetails(ticketKey) {
   const auth = getJiraAuth();
   if (!auth) {
     throw new Error('Jira credentials are not configured; cannot fetch ticket details.');
   }
-  const issue = await getIssue(auth, ticketKey, 'summary,description');
+  const issue = await getIssue(auth, ticketKey, 'summary,description,issuetype');
   const summary = (issue.fields?.summary || '').trim();
   const description = adfToPlainText(issue.fields?.description).trim();
-  return { summary, description: description || summary };
+  const issueType = issue.fields?.issuetype?.name || null;
+  return { summary, description: description || summary, issueType };
+}
+
+/**
+ * Maps a Jira issue type name to the automation it should trigger, or null if this ticket isn't
+ * automated at all. Deliberately narrow: "User Story Bug" (a subtask type) is the only bugfix
+ * trigger, "Technical Debt" is the only tech-debt trigger. Everything else - including "Task"
+ * (inconsistently reused for tech-debt work in practice, making it too ambiguous to classify
+ * safely) and "Story"/"User Story" parent containers - is intentionally ignored.
+ */
+export function classifyTicketType(issueType) {
+  if (issueType === 'User Story Bug') return 'bugfix-ticket';
+  if (issueType === 'Technical Debt') return 'tech-debt-ticket';
+  return null;
 }
 
 /**

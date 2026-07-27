@@ -2,41 +2,11 @@ name: Unified Agent Runner
 
 on:
   repository_dispatch:
-    types: [bugfix-ticket, tech-debt-ticket]
+    types: [jira-ticket]
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      repos: ${{ steps.matrix.outputs.repos }}
-    steps:
-      # n8n only forwards the ticket key and type (as event_type). It normally sends no
-      # target_repo/branch/path at all - those are resolved later by agent-hub itself (from the
-      # Jira parent ticket for bugfix, or from a vector-DB search for tech-debt). This step still
-      # accepts an optional `target_repos: [{ repo, branch, path }, ...]` array (or legacy single
-      # `target_repo`/`target_branch`/`target_path`) for the rare case where n8n already knows
-      # the repo(s), normalizing either shape into a JSON array consumed by the matrix below.
-      - name: Normalize target repo(s) into a matrix
-        id: matrix
-        shell: bash
-        run: |
-          cat <<'EOF' > payload.json
-          ${{ toJson(github.event.client_payload) }}
-          EOF
-          if jq -e 'has("target_repos") and (.target_repos | type == "array") and (.target_repos | length > 0)' payload.json > /dev/null; then
-            REPOS=$(jq -c '.target_repos' payload.json)
-          else
-            REPOS=$(jq -c '[{repo: .target_repo, branch: .target_branch, path: .target_path}]' payload.json)
-          fi
-          echo "repos=$REPOS" >> "$GITHUB_OUTPUT"
-
   run-agent:
-    needs: prepare
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target: ${{ fromJson(needs.prepare.outputs.repos) }}
     steps:
       - name: Checkout agent-hub
         uses: actions/checkout@v4
@@ -57,8 +27,9 @@ jobs:
       - name: Install GitHub Copilot CLI
         run: npm install -g @github/copilot
 
-      # n8n only forwards the ticket key and type (via event_type) - not the description - so this
-      # step fetches the ticket's summary/description directly from Jira for later steps to use.
+      # n8n only ever sends the ticket key - the ticket type (bugfix/tech-debt/not automated) is
+      # classified entirely within agent-hub, from the Jira issue type. This step fetches the
+      # ticket's summary/description and resolves its type for later steps to use.
       - name: Fetch ticket details
         id: fetch-ticket
         working-directory: agent-hub
@@ -69,13 +40,13 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
 
-      # No explicit checkout step: when TARGET_REPO isn't already known (the common case, since
-      # n8n only sends the ticket key/type), the agent scripts themselves gather candidate repo(s)
-      # - via the Jira parent ticket for bugfix, or a vector-DB search otherwise - clone each
-      # candidate into WORKSPACE_DIR, and (if more than one came back) let the coding agent inspect
-      # the real checked-out code to decide which one to actually modify.
+      # No checkout step here either: bugfix-agent.js / tech-debt-agent.js gather candidate
+      # repo(s) themselves entirely within GitHub Actions - via the Jira parent ticket for bugfix,
+      # or a vector-DB search for tech-debt - clone each candidate into WORKSPACE_DIR, and (if more
+      # than one came back) let the coding agent inspect the real checked-out code to decide which
+      # one to actually modify.
       - name: Run bugfix agent
-        if: github.event.action == 'bugfix-ticket'
+        if: steps.fetch-ticket.outputs.ticket_type == 'bugfix-ticket'
         working-directory: agent-hub
         run: node agent-logic/bugfix-agent.js
         env:
@@ -90,12 +61,10 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
           TICKET_DESCRIPTION: ${{ steps.fetch-ticket.outputs.description }}
-          TARGET_REPO: ${{ matrix.target.repo }}
-          TARGET_BRANCH: ${{ matrix.target.branch }}
           WORKSPACE_DIR: ${{ github.workspace }}/workspace
 
       - name: Run tech-debt agent
-        if: github.event.action == 'tech-debt-ticket'
+        if: steps.fetch-ticket.outputs.ticket_type == 'tech-debt-ticket'
         working-directory: agent-hub
         run: node agent-logic/tech-debt-agent.js
         env:
@@ -110,7 +79,4 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
           TICKET_DESCRIPTION: ${{ steps.fetch-ticket.outputs.description }}
-          TARGET_REPO: ${{ matrix.target.repo }}
-          TARGET_PATH: ${{ matrix.target.path }}
-          TARGET_BRANCH: ${{ matrix.target.branch }}
           WORKSPACE_DIR: ${{ github.workspace }}/workspace

@@ -14,8 +14,8 @@ async function main() {
     TICKET_KEY,
     TICKET_DESCRIPTION,
     TARGET_REPO,
-    TARGET_PATH = '.',
-    TARGET_BRANCH = 'main',
+    TARGET_PATH,
+    TARGET_BRANCH,
     WORKSPACE_DIR = path.resolve('workspace'),
   } = process.env;
 
@@ -126,8 +126,8 @@ files in any other candidate.`,
     }
   }
 
-  const chosenBranch = candidates.find((c) => c.repo === chosenRepo)?.branch || TARGET_BRANCH;
-  const chosenPath = candidates.find((c) => c.repo === chosenRepo)?.path || '.';
+  const chosenBranch = candidates.find((c) => c.repo === chosenRepo)?.branch || TARGET_BRANCH || 'main';
+  const chosenPath = candidates.find((c) => c.repo === chosenRepo)?.path || TARGET_PATH || '.';
   const pushed = await commitAndPush(candidateDirs[chosenRepo], branchName, `${result.commitMessage}\n\nAddresses ${TICKET_KEY}`);
   if (!pushed) {
     console.log(`No changes were made by the agent in ${chosenRepo}; skipping PR creation.`);

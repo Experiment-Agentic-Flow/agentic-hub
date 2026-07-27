@@ -53,18 +53,21 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 ## The agentic ticket lifecycle
 
 1. **Ticket ingestion** — Jira webhook → n8n.
-2. **Trigger GitHub Hub** — n8n forwards only the ticket key and type: it sends a `repository_dispatch` with event type
-   `bugfix-ticket` or `tech-debt-ticket` and a `client_payload` of `{ ticket_key }`. Everything else - description, target
-   repo(s), branch, path - is resolved by agent-hub itself, not by n8n.
-
-   (An optional `target_repos: [{ repo, branch, path }, ...]` array, or legacy single `target_repo`/`target_branch`/`target_path`
-   fields, are still accepted for the rare case where n8n already knows the repo(s) to target.)
-3. **Agent execution** — [.github/workflows/unified-agent-runner.yml](.github/workflows/unified-agent-runner.yml):
-   - **Fetch ticket details** — [agent-logic/fetchTicket.js](agent-logic/fetchTicket.js) fetches the ticket's
-     summary/description straight from Jira using the ticket key.
+2. **Trigger GitHub Hub** — n8n forwards only the ticket key: it sends a single generic `repository_dispatch` (event type
+   `jira-ticket`) with a `client_payload` of `{ ticket_key }` on *any* ticket creation. Nothing else - not the description,
+   not the ticket type, not target repo(s)/branch/path - is ever sent by n8n; all of that is resolved entirely within
+   GitHub Actions by agent-hub itself.
+3. **Agent execution** — [.github/workflows/unified-agent-runner.yml](.github/workflows/unified-agent-runner.yml) is a
+   single job (no matrix - candidate repos are gathered and cloned from inside the Node scripts, not fanned out per-repo
+   at the workflow level):
+   - **Fetch and classify the ticket** — [agent-logic/fetchTicket.js](agent-logic/fetchTicket.js) fetches the ticket's
+     summary/description/issue type from Jira, then [agent-logic/jira.js](agent-logic/jira.js)'s `classifyTicketType()`
+     maps the Jira issue type to an automation category: **"User Story Bug"** (a subtask type) → bugfix,
+     **"Technical Debt"** → tech-debt, anything else (`Story`/`User Story` parent containers, `Task`, `Epic`, ...) → not
+     automated, and the job cleanly no-ops rather than guessing.
    - **Gather candidate repos** — [agent-logic/repoCandidates.js](agent-logic/repoCandidates.js) gathers candidate repo(s)
      for [agent-logic/bugfix-agent.js](agent-logic/bugfix-agent.js) / [agent-logic/tech-debt-agent.js](agent-logic/tech-debt-agent.js)
-     to consider, in priority order: an explicit `target_repo` always wins; otherwise bugfix tickets look up **every** repo
+     to consider, in priority order: bugfix tickets look up **every** repo
      referenced by the Jira parent ticket's linked PRs *and* branches ([agent-logic/jira.js](agent-logic/jira.js)) - a
      parent story/epic can span several repos, so all of them become candidates; otherwise (tech-debt always, since it
      has no parent ticket) an adaptive set of "appropriate" candidates comes from a vector-DB search
@@ -93,7 +96,9 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 6. `ORG_GITHUB_PAT` must be an organization-level PAT (or GitHub App installation token) with `repo` and `pull_request` scope
    across every target repository.
 7. Point your n8n workflow's HTTP node at
-   `POST https://api.github.com/repos/<org>/agent-hub/dispatches` with `event_type: bugfix-ticket` or `tech-debt-ticket`.
+   `POST https://api.github.com/repos/<org>/agent-hub/dispatches` with `event_type: jira-ticket` and
+   `client_payload: { "ticket_key": "<the Jira issue key>" }` - on every new ticket, regardless of type; agent-hub
+   decides whether/how to act on it.
 
 ## Local commands
 
