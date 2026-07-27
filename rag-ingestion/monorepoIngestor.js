@@ -26,6 +26,27 @@ async function sparseCheckout(repo, branch) {
   return dest;
 }
 
+/**
+ * Installs dependencies so `npx nx` resolves to the workspace's own locally installed nx/plugins
+ * instead of the generic ad-hoc version npx would otherwise auto-install (which can't see this
+ * workspace's config and fails with "Could not find Nx modules"). Best-effort: if install fails
+ * (or there's no lockfile), readProjectGraph's own fallback still kicks in.
+ */
+function installDependencies(repoDir) {
+  const hasLockfile = fs.existsSync(path.join(repoDir, 'package-lock.json'));
+  if (!fs.existsSync(path.join(repoDir, 'package.json'))) {
+    return false;
+  }
+  try {
+    const cmd = hasLockfile ? 'npm ci --ignore-scripts --no-audit --no-fund' : 'npm install --ignore-scripts --no-audit --no-fund';
+    execSync(cmd, { cwd: repoDir, stdio: 'pipe' });
+    return true;
+  } catch (err) {
+    console.warn(`  npm install failed for ${repoDir}, nx graph will likely fall back to project.json scan: ${err.message}`);
+    return false;
+  }
+}
+
 /** Runs `npx nx graph` to get the authoritative project dependency graph. */
 function readProjectGraph(repoDir) {
   const outFile = path.join(repoDir, '.nx-graph.json');
@@ -64,6 +85,7 @@ export async function ingestMonorepo(entry, runId) {
   const repoDir = await sparseCheckout(repo, branch);
 
   try {
+    installDependencies(repoDir);
     const nodes = readProjectGraph(repoDir) || readProjectJsonFallback(repoDir);
     const records = [];
 
