@@ -39,7 +39,10 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 
 1. **Read registry** — [rag-ingestion/index.js](rag-ingestion/index.js) reads [rag-registry.json](rag-registry.json).
 2. **Process Nx monorepos** — [rag-ingestion/monorepoIngestor.js](rag-ingestion/monorepoIngestor.js) does a shallow/sparse
-   clone, runs `npx nx graph` (falling back to scanning `project.json` files if that fails), and embeds each project separately.
+   clone and reads each project's `project.json` directly (deliberately bypassing the Nx CLI - running `npm install` +
+   `npx nx graph` against an arbitrary target repo is fragile in CI: peer-dependency conflicts, postinstall permission
+   issues, long install times), picking up each project's declared `implicitDependencies` as a best-effort dependency
+   list, and embeds each project separately.
 3. **Process API services** — API services are all .NET Core, so [rag-ingestion/apiServiceIngestor.js](rag-ingestion/apiServiceIngestor.js)
    fetches `README.md`, auto-detects the `.sln`/`.csproj` manifest (overridable via `manifest` in the registry), and scans the
    whole repo tree (excluding `bin`/`obj`/`packages`), then

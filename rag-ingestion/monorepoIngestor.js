@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import simpleGit from 'simple-git';
@@ -27,45 +26,16 @@ async function sparseCheckout(repo, branch) {
 }
 
 /**
- * Installs dependencies so `npx nx` resolves to the workspace's own locally installed nx/plugins
- * instead of the generic ad-hoc version npx would otherwise auto-install (which can't see this
- * workspace's config and fails with "Could not find Nx modules"). Best-effort: if install fails
- * (or there's no lockfile), readProjectGraph's own fallback still kicks in.
+ * Reads each project's config directly from its `project.json` - deliberately bypassing the Nx
+ * CLI entirely. Running `npm install` + `npx nx graph` in an arbitrary target repo is fragile in
+ * CI (peer-dependency conflicts, postinstall scripts needing permissions we don't want to grant,
+ * long install times), so instead of the real computed project graph, this reads each project's
+ * declared `implicitDependencies` (a real Nx concept - explicit project-to-project deps authors
+ * declare in project.json) as a best-effort dependency list. It won't catch dependencies inferred
+ * purely from source imports, but needs no installed node_modules and can't fail on this repo's
+ * own dependency conflicts.
  */
-function installDependencies(repoDir) {
-  const hasLockfile = fs.existsSync(path.join(repoDir, 'package-lock.json'));
-  if (!fs.existsSync(path.join(repoDir, 'package.json'))) {
-    return false;
-  }
-  try {
-    // --legacy-peer-deps: we only need node_modules populated enough for `nx graph` to resolve
-    // plugins - we're not building/running the app, so strict peer-dep conflicts don't matter here.
-    const cmd = hasLockfile
-      ? 'npm ci --ignore-scripts --no-audit --no-fund --legacy-peer-deps'
-      : 'npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps';
-    execSync(cmd, { cwd: repoDir, stdio: 'pipe' });
-    return true;
-  } catch (err) {
-    console.warn(`  npm install failed for ${repoDir}, nx graph will likely fall back to project.json scan: ${err.message}`);
-    return false;
-  }
-}
-
-/** Runs `npx nx graph` to get the authoritative project dependency graph. */
-function readProjectGraph(repoDir) {
-  const outFile = path.join(repoDir, '.nx-graph.json');
-  try {
-    execSync(`npx nx graph --file=${outFile}`, { cwd: repoDir, stdio: 'pipe' });
-    const graph = JSON.parse(fs.readFileSync(outFile, 'utf-8'));
-    return graph.graph?.nodes || null;
-  } catch (err) {
-    console.warn(`  nx graph failed for ${repoDir}, falling back to project.json scan: ${err.message}`);
-    return null;
-  }
-}
-
-/** Fallback: directly scan for project.json files if `nx graph` isn't available. */
-function readProjectJsonFallback(repoDir) {
+function readProjectsFromProjectJson(repoDir) {
   const projectFiles = fg.sync('**/project.json', { cwd: repoDir, ignore: ['**/node_modules/**'] });
   const nodes = {};
   for (const file of projectFiles) {
@@ -75,7 +45,7 @@ function readProjectJsonFallback(repoDir) {
       const projectPath = path.dirname(file);
       nodes[project.name || projectPath] = {
         data: { root: projectPath, tags: project.tags || [], projectType: project.projectType || 'unknown' },
-        dependencies: [],
+        dependencies: project.implicitDependencies || [],
       };
     } catch {
       // skip unreadable project.json
@@ -89,8 +59,7 @@ export async function ingestMonorepo(entry, runId) {
   const repoDir = await sparseCheckout(repo, branch);
 
   try {
-    installDependencies(repoDir);
-    const nodes = readProjectGraph(repoDir) || readProjectJsonFallback(repoDir);
+    const nodes = readProjectsFromProjectJson(repoDir);
     const records = [];
 
     for (const [projectName, node] of Object.entries(nodes)) {

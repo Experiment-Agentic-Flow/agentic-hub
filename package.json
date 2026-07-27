@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Central hub for nightly RAG ingestion and autonomous coding agents (bugfix & tech-debt), triggered via Jira -> n8n -> GitHub repository_dispatch.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "ingest": "node rag-ingestion/index.js",
