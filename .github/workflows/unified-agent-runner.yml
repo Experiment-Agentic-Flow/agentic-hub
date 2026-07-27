@@ -38,6 +38,7 @@ jobs:
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_API_VERSION: ${{ vars.JIRA_API_VERSION }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
 
       # No checkout step here either: bugfix-agent.js / tech-debt-agent.js gather candidate
@@ -59,6 +60,7 @@ jobs:
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_API_VERSION: ${{ vars.JIRA_API_VERSION }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
           TICKET_DESCRIPTION: ${{ steps.fetch-ticket.outputs.description }}
           WORKSPACE_DIR: ${{ github.workspace }}/workspace
@@ -77,6 +79,7 @@ jobs:
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_API_VERSION: ${{ vars.JIRA_API_VERSION }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
           TICKET_DESCRIPTION: ${{ steps.fetch-ticket.outputs.description }}
           WORKSPACE_DIR: ${{ github.workspace }}/workspace

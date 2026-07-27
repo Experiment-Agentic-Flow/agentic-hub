@@ -1,12 +1,16 @@
 import axios from 'axios';
 
+// Jira Cloud uses REST API v3 (supports ADF rich-text fields); Jira Server/Data Center only ever
+// shipped v2 (plain-string/wiki-markup fields) - v3 doesn't exist there and 404s. Default to v2
+// since that's the more common self-hosted case; override with JIRA_API_VERSION=3 for Cloud.
 function getJiraAuth() {
-  const { JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN } = process.env;
+  const { JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_API_VERSION } = process.env;
   if (!JIRA_BASE_URL || !JIRA_EMAIL || !JIRA_API_TOKEN) {
     return null;
   }
   return {
     baseUrl: JIRA_BASE_URL,
+    apiVersion: JIRA_API_VERSION || '2',
     headers: { Authorization: `Basic ${Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64')}` },
   };
 }
@@ -19,28 +23,26 @@ export async function addJiraComment(ticketKey, commentText) {
     return;
   }
 
-  await axios.post(
-    `${auth.baseUrl}/rest/api/3/issue/${ticketKey}/comment`,
-    {
-      body: {
-        type: 'doc',
-        version: 1,
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: commentText }] }],
-      },
-    },
-    { headers: { ...auth.headers, 'Content-Type': 'application/json' } }
-  );
+  // v3 (Cloud) requires an ADF document body; v2 (Server/Data Center) just wants a plain string.
+  const body =
+    auth.apiVersion === '3'
+      ? { body: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: commentText }] }] } }
+      : { body: commentText };
+
+  await axios.post(`${auth.baseUrl}/rest/api/${auth.apiVersion}/issue/${ticketKey}/comment`, body, {
+    headers: { ...auth.headers, 'Content-Type': 'application/json' },
+  });
 }
 
 async function getIssue(auth, ticketKey, fields) {
-  const { data } = await axios.get(`${auth.baseUrl}/rest/api/3/issue/${ticketKey}`, {
+  const { data } = await axios.get(`${auth.baseUrl}/rest/api/${auth.apiVersion}/issue/${ticketKey}`, {
     headers: auth.headers,
     params: { fields },
   });
   return data;
 }
 
-/** Flattens a Jira Atlassian Document Format (ADF) node tree into plain text. */
+/** Flattens a Jira Atlassian Document Format (ADF) node tree into plain text (v2's description is already a plain string, so this just passes it through). */
 function adfToPlainText(node) {
   if (!node) return '';
   if (typeof node === 'string') return node;
