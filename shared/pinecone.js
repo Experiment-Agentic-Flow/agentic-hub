@@ -1,0 +1,62 @@
+import { getPineconeClient } from './embeddings.js';
+import { PINECONE_INDEX, EMBEDDING_DIMENSION } from './config.js';
+
+export async function getIndex() {
+  const client = getPineconeClient();
+  return client.index(PINECONE_INDEX);
+}
+
+/** Creates the serverless index if it doesn't already exist. Safe to call every run. */
+export async function ensureIndexExists() {
+  const client = getPineconeClient();
+  const existing = await client.listIndexes();
+  const found = existing.indexes?.some((i) => i.name === PINECONE_INDEX);
+  if (!found) {
+    await client.createIndex({
+      name: PINECONE_INDEX,
+      dimension: EMBEDDING_DIMENSION,
+      metric: 'cosine',
+      spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
+      waitUntilReady: true,
+    });
+  }
+}
+
+export async function upsertRecords(records, namespace = 'default') {
+  if (records.length === 0) return;
+  const index = await getIndex();
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const batch = records.slice(i, i + BATCH_SIZE);
+    await index.namespace(namespace).upsert(batch);
+  }
+}
+
+/**
+ * Deletes vectors belonging to `repo` whose metadata.runId doesn't match the current run,
+ * i.e. anything that no longer exists / wasn't re-embedded in this ingestion pass.
+ */
+export async function pruneStale(repo, currentRunId, namespace = 'default') {
+  const index = await getIndex();
+  const zeroVector = new Array(EMBEDDING_DIMENSION).fill(0);
+  const result = await index.namespace(namespace).query({
+    vector: zeroVector,
+    topK: 1000,
+    filter: { repo: { $eq: repo } },
+    includeMetadata: true,
+  });
+
+  const staleIds = (result.matches || [])
+    .filter((match) => match.metadata?.runId !== currentRunId)
+    .map((match) => match.id);
+
+  if (staleIds.length > 0) {
+    await index.namespace(namespace).deleteMany(staleIds);
+  }
+  return staleIds.length;
+}
+
+export async function queryByVector(vector, { topK = 5, filter } = {}, namespace = 'default') {
+  const index = await getIndex();
+  return index.namespace(namespace).query({ vector, topK, filter, includeMetadata: true });
+}

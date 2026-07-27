@@ -1,0 +1,23 @@
+{
+  "name": "agent-hub",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Central hub for nightly RAG ingestion and autonomous coding agents (bugfix & tech-debt), triggered via Jira -> n8n -> GitHub repository_dispatch.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "ingest": "node rag-ingestion/index.js",
+    "agent:bugfix": "node agent-logic/bugfix-agent.js",
+    "agent:tech-debt": "node agent-logic/tech-debt-agent.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.2",
+    "@pinecone-database/pinecone": "^3.0.3",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "fast-glob": "^3.3.2",
+    "simple-git": "^3.27.0"
+  }
+}
