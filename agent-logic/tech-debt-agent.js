@@ -130,6 +130,7 @@ applies to, and leave every other candidate completely untouched.`,
     );
     if (!pushed) {
       console.log(`No changes were made by the agent in ${candidate.repo}; skipping PR creation.`);
+      fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
       continue;
     }
 
@@ -143,6 +144,7 @@ applies to, and leave every other candidate completely untouched.`,
 
     console.log(`Opened PR: ${prUrl}`);
     openedPrs.push({ repo: candidate.repo, path: candidate.path, prUrl });
+    fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
   }
 
   if (openedPrs.length === 0) {

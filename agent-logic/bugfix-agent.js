@@ -108,6 +108,7 @@ completely untouched.`,
     );
     if (!pushed) {
       console.log(`No changes were made by the agent in ${candidate.repo}; skipping PR creation.`);
+      fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
       continue;
     }
 
@@ -121,6 +122,7 @@ completely untouched.`,
 
     console.log(`Opened PR: ${prUrl}`);
     openedPrs.push({ repo: candidate.repo, prUrl });
+    fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
   }
 
   if (openedPrs.length === 0) {
