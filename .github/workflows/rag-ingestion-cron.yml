@@ -32,6 +32,5 @@ jobs:
           COPILOT_SUMMARY_MODEL: ${{ vars.COPILOT_SUMMARY_MODEL }}
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
           PINECONE_INDEX: ${{ vars.PINECONE_INDEX }}
-          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
-          JINA_EMBEDDING_MODEL: ${{ vars.JINA_EMBEDDING_MODEL }}
+          PINECONE_EMBEDDING_MODEL: ${{ vars.PINECONE_EMBEDDING_MODEL }}
           ORG_GITHUB_PAT: ${{ secrets.ORG_GITHUB_PAT }}

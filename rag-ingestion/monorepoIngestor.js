@@ -50,7 +50,7 @@ export async function ingestMonorepo(entry, runId) {
       // Each project also gets its own read-only agent pass over its actual source, so it has a
       // real semantic "purpose" description to embed - not just structural tags/deps, which match
       // poorly against natural-language ticket descriptions.
-      let summary = { purpose: 'unknown', notablePatterns: [] };
+      let summary = { purpose: 'unknown', keyModules: [], notablePatterns: [] };
       try {
         summary = await summarizeMonorepoProject({ repo, projectName, cwd: projectDir });
       } catch (err) {
@@ -65,6 +65,7 @@ export async function ingestMonorepo(entry, runId) {
         `Tags: ${(data.tags || []).join(', ')}`,
         `Depends on: ${deps.map((d) => d.target || d).join(', ')}`,
         `Purpose: ${summary.purpose}`,
+        `Key modules: ${(summary.keyModules || []).join(', ')}`,
         `Notable patterns: ${(summary.notablePatterns || []).join(', ')}`,
       ].join('\n');
 
@@ -78,6 +79,10 @@ export async function ingestMonorepo(entry, runId) {
           type: 'monorepo_project',
           projectPath: data.root || 'unknown',
           tags: data.tags || [],
+          dependsOn: deps.map((d) => d.target || d),
+          purpose: summary.purpose || 'unknown',
+          keyModules: summary.keyModules || [],
+          notablePatterns: summary.notablePatterns || [],
           runId,
           updatedAt: new Date().toISOString(),
         },
