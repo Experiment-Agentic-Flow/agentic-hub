@@ -54,3 +54,32 @@ export async function runCopilotAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000 
   });
   return stdout.trim();
 }
+
+/**
+ * Runs `copilot` as a read-only exploration agent scoped to `cwd`: it's granted the read tool so
+ * it can actually open real source files (routes/handlers, domain models, configs - whatever it
+ * decides is relevant), but write and shell are both denied since this is analysis only, used by
+ * rag-ingestion to ground repo/project summaries in the real codebase instead of a pre-fetched
+ * README/manifest snippet.
+ */
+export async function runCopilotAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 1000, model = COPILOT_MODEL } = {}) {
+  const args = [
+    '-p',
+    prompt,
+    '-s',
+    '--no-ask-user',
+    '--allow-all-paths', // cwd is a throwaway ingestion checkout
+    '--allow-tool=read',
+    '--deny-tool=write',
+    '--deny-tool=shell',
+  ];
+  if (model) args.push('--model', model);
+
+  const { stdout } = await execFileAsync('copilot', args, {
+    cwd,
+    maxBuffer: 1024 * 1024 * 64,
+    timeout: timeoutMs,
+    env: process.env,
+  });
+  return stdout.trim();
+}

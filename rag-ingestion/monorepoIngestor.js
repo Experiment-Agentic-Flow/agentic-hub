@@ -1,29 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import simpleGit from 'simple-git';
 import fg from 'fast-glob';
 import { embedTexts } from '../shared/embeddings.js';
-
-const TMP_ROOT = path.resolve('.tmp');
-
-async function sparseCheckout(repo, branch) {
-  const dest = path.join(TMP_ROOT, repo.replace('/', '__'));
-  fs.rmSync(dest, { recursive: true, force: true });
-  fs.mkdirSync(dest, { recursive: true });
-
-  const remoteUrl = `https://x-access-token:${process.env.ORG_GITHUB_PAT}@github.com/${repo}.git`;
-  const git = simpleGit();
-  try {
-    await git.clone(remoteUrl, dest, ['--filter=blob:none', '--depth=1', '--branch', branch, '--single-branch']);
-  } catch (err) {
-    throw new Error(
-      `Failed to clone ${repo}#${branch} - ORG_GITHUB_PAT likely lacks access to this repo (fine-grained PATs need ` +
-        `"Contents" permission and must explicitly include this repo; classic PATs need the "repo" scope; orgs with ` +
-        `SSO enforcement require the token to be authorized for the org). Original error: ${err.message}`
-    );
-  }
-  return dest;
-}
+import { cloneForAnalysis } from './repoClone.js';
+import { summarizeMonorepoProject } from './summarizer.js';
 
 /**
  * Reads each project's config directly from its `project.json` - deliberately bypassing the Nx
@@ -56,7 +36,7 @@ function readProjectsFromProjectJson(repoDir) {
 
 export async function ingestMonorepo(entry, runId) {
   const { repo, branch = 'main' } = entry;
-  const repoDir = await sparseCheckout(repo, branch);
+  const repoDir = await cloneForAnalysis(repo, branch);
 
   try {
     const nodes = readProjectsFromProjectJson(repoDir);
@@ -65,6 +45,18 @@ export async function ingestMonorepo(entry, runId) {
     for (const [projectName, node] of Object.entries(nodes)) {
       const data = node.data || {};
       const deps = node.dependencies || [];
+      const projectDir = path.resolve(repoDir, data.root || '.');
+
+      // Each project also gets its own read-only agent pass over its actual source, so it has a
+      // real semantic "purpose" description to embed - not just structural tags/deps, which match
+      // poorly against natural-language ticket descriptions.
+      let summary = { purpose: 'unknown', notablePatterns: [] };
+      try {
+        summary = await summarizeMonorepoProject({ repo, projectName, cwd: projectDir });
+      } catch (err) {
+        console.warn(`  agent analysis failed for ${projectName}, continuing with structural metadata only: ${err.message}`);
+      }
+
       const summaryText = [
         `Repository: ${repo}`,
         `Project: ${projectName}`,
@@ -72,6 +64,8 @@ export async function ingestMonorepo(entry, runId) {
         `Type: ${data.projectType || 'unknown'}`,
         `Tags: ${(data.tags || []).join(', ')}`,
         `Depends on: ${deps.map((d) => d.target || d).join(', ')}`,
+        `Purpose: ${summary.purpose}`,
+        `Notable patterns: ${(summary.notablePatterns || []).join(', ')}`,
       ].join('\n');
 
       const [vector] = await embedTexts([summaryText], 'passage');
