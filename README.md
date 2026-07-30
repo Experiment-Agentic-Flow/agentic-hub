@@ -31,24 +31,31 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 | [rag-registry.json](rag-registry.json) | Allowlist of repos to ingest, split into `api_services` and `monorepos`. |
 | [.github/workflows/rag-ingestion-cron.yml](.github/workflows/rag-ingestion-cron.yml) | Nightly cron that rebuilds the vector DB. |
 | [.github/workflows/unified-agent-runner.yml](.github/workflows/unified-agent-runner.yml) | Entry point triggered by n8n via `repository_dispatch`. |
-| [rag-ingestion/](rag-ingestion/index.js) | Scripts that auto-heal API READMEs and parse Nx monorepo graphs into embeddings. |
+| [rag-ingestion/](rag-ingestion/index.js) | Scripts that clone each repo, have a Copilot CLI agent explore the real code, and embed the resulting summaries. |
 | [agent-logic/](agent-logic/copilotAgent.js) | The LLM code-editing agents: [bugfix-agent.js](agent-logic/bugfix-agent.js) and [tech-debt-agent.js](agent-logic/tech-debt-agent.js). |
 | [shared/](shared/config.js) | Shared Pinecone / Copilot CLI clients and config used by both layers. |
 
 ## The nightly RAG ingestion flow
 
-1. **Read registry** — [rag-ingestion/index.js](rag-ingestion/index.js) reads [rag-registry.json](rag-registry.json).
-2. **Process Nx monorepos** — [rag-ingestion/monorepoIngestor.js](rag-ingestion/monorepoIngestor.js) does a shallow/sparse
-   clone and reads each project's `project.json` directly (deliberately bypassing the Nx CLI - running `npm install` +
-   `npx nx graph` against an arbitrary target repo is fragile in CI: peer-dependency conflicts, postinstall permission
-   issues, long install times), picking up each project's declared `implicitDependencies` as a best-effort dependency
-   list, and embeds each project separately.
-3. **Process API services** — API services are all .NET Core, so [rag-ingestion/apiServiceIngestor.js](rag-ingestion/apiServiceIngestor.js)
-   fetches `README.md`, auto-detects the `.sln`/`.csproj` manifest (overridable via `manifest` in the registry), and scans the
-   whole repo tree (excluding `bin`/`obj`/`packages`), then
-   [rag-ingestion/summarizer.js](rag-ingestion/summarizer.js) asks the GitHub Copilot CLI to produce a factual, ground-truth JSON summary.
-4. **Sync vector DB** — [shared/pinecone.js](shared/pinecone.js) embeds text via Pinecone's hosted inference API, upserts
-   with `{ repo, type, runId, updatedAt, ... }` metadata, and prunes any vectors for that repo not refreshed in the current run.
+1. **Read registry** — [rag-ingestion/index.js](rag-ingestion/index.js) reads [rag-registry.json](rag-registry.json), processing
+   every repo independently: one failure doesn't stop the rest, but if any repo fails the whole run still exits non-zero so
+   CI shows it as failed rather than silently swallowing the error.
+2. **Process Nx monorepos** — [rag-ingestion/monorepoIngestor.js](rag-ingestion/monorepoIngestor.js) clones the repo
+   ([rag-ingestion/repoClone.js](rag-ingestion/repoClone.js)) and reads each project's `project.json` directly (deliberately
+   bypassing the Nx CLI - running `npm install` + `npx nx graph` against an arbitrary target repo is fragile in CI:
+   peer-dependency conflicts, postinstall permission issues, long install times), picking up each project's declared
+   `implicitDependencies` as a best-effort dependency list. A read-only Copilot CLI agent then explores each project's
+   actual source ([rag-ingestion/summarizer.js](rag-ingestion/summarizer.js)'s `summarizeMonorepoProject`) to produce a
+   real `purpose`/`keyModules`/`notablePatterns` description, since structural tags/deps alone match poorly against
+   natural-language ticket descriptions.
+3. **Process API services** — [rag-ingestion/apiServiceIngestor.js](rag-ingestion/apiServiceIngestor.js) clones the repo, then
+   a read-only Copilot CLI agent explores the checked-out code itself (README, manifest, controllers/handlers, domain
+   models) rather than being handed a few pre-fetched files, and produces a factual JSON summary
+   ([rag-ingestion/summarizer.js](rag-ingestion/summarizer.js)'s `summarizeApiService`).
+4. **Sync vector DB** — [shared/pinecone.js](shared/pinecone.js) embeds the summary text via Pinecone's hosted inference API,
+   upserts with `{ repo, type, purpose, keyModules, dependencies/dependsOn, notablePatterns, runId, updatedAt, ... }`
+   metadata (so a query returns real descriptive content, not just a bare repo name + score), and prunes any vectors for
+   that repo not refreshed in the current run.
 
 ## The agentic ticket lifecycle
 
@@ -77,12 +84,15 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
    - **Clone and decide** — each surviving candidate (skipping any that already has an open PR for this ticket) is shallow
      -cloned into its own subfolder of the workspace ([agent-logic/repoWorkspace.js](agent-logic/repoWorkspace.js)). If
      there's only one candidate, the coding agent works on it directly. If there are several, one Copilot CLI session is
-     given all the checked-out candidates side by side and decides which single repo to modify based on the real code,
-     not just vector-search metadata - then edits only inside that repo's subfolder.
-4. **Commit and notify** — for the chosen repo, the agent runs a GitHub Copilot CLI coding session
-   ([agent-logic/copilotAgent.js](agent-logic/copilotAgent.js)) to read/write files, commits and pushes a branch, opens a PR
-   ([agent-logic/githubPr.js](agent-logic/githubPr.js)), and comments that repo's PR link back onto the Jira ticket
-   ([agent-logic/jira.js](agent-logic/jira.js)) — so a multi-repo ticket ends up with one comment per repo/PR.
+     given all the checked-out candidates side by side - the ticket may apply to only one of them, or to several at once
+     (e.g. a fix or cleanup that spans more than one service) - and it edits every repo the ticket genuinely applies to,
+     leaving the rest untouched.
+4. **Commit and notify** — rather than trusting the agent's self-report of which repo(s) it touched, every candidate is
+   checked for real changes via `git status` ([agent-logic/git.js](agent-logic/git.js)): each repo with actual changes gets
+   its own branch pushed and its own PR opened ([agent-logic/githubPr.js](agent-logic/githubPr.js)); repos the agent left
+   untouched are skipped and their local clone is removed. A single Jira comment then lists the PR link for every repo
+   that got one ([agent-logic/jira.js](agent-logic/jira.js)) — so a multi-repo ticket ends up with one comment listing
+   every PR, not just one.
 
 ## Setup
 

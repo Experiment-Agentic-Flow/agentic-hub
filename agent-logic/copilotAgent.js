@@ -4,8 +4,8 @@ import { runCopilotAgent } from '../shared/copilotCli.js';
  * Delegates the coding task to the GitHub Copilot CLI, scoped to rootDir. Copilot CLI has its
  * own sandboxed file read/write tools, so there's no need to implement a custom tool-use loop -
  * we just give it the instructions and ask it to end with a small JSON summary we can parse
- * for the commit message / PR body. `extraResponseFields` lets callers require additional keys in
- * that final JSON (e.g. `chosenRepo`, when the agent had to pick between multiple candidate repos).
+ * for the commit message / PR body. `extraResponseFields` lets callers require additional keys
+ * in that final JSON if a future caller needs the agent to report something beyond those two.
  */
 export async function runAgentLoop({ rootDir, systemPrompt, task, extraResponseFields = {} }) {
   const responseShape = {
