@@ -28,6 +28,7 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 
 | Path | Purpose |
 |---|---|
+| [docs/WORKFLOW.md](docs/WORKFLOW.md) | End-to-end ticket-to-PR workflow, with an elaborated deep dive on the RAG layer: why it exists, how it's generated, what's stored, and model details. |
 | [rag-registry.json](rag-registry.json) | Allowlist of repos to ingest, split into `api_services` and `monorepos`. |
 | [.github/workflows/rag-ingestion-cron.yml](.github/workflows/rag-ingestion-cron.yml) | Nightly cron that rebuilds the vector DB. |
 | [.github/workflows/unified-agent-runner.yml](.github/workflows/unified-agent-runner.yml) | Entry point triggered by n8n via `repository_dispatch`. |
