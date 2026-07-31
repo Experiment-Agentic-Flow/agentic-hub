@@ -1,19 +1,19 @@
 {
   "api_services": [
     {
-      "repo": "VJ-Poovin-Organization/quantitytakeoffservice",
+      "repo": "Experiment-Agentic-Flow/quantitytakeoffservice",
       "branch": "develop",
       "tech_stack": "dotnet"
     },
     {
-      "repo": "VJ-Poovin-Organization/quantitytakeofforchestratorservice",
+      "repo": "Experiment-Agentic-Flow/quantitytakeofforchestratorservice",
       "branch": "develop",
       "tech_stack": "dotnet"
     }
   ],
   "monorepos": [
     {
-      "repo": "VJ-Poovin-Organization/mepworkspace",
+      "repo": "Experiment-Agentic-Flow/mepworkspace",
       "branch": "develop",
       "type": "nx"
     }
