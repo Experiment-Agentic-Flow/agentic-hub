@@ -1,7 +1,11 @@
 import { getIndex } from '../shared/pinecone.js';
 import { EMBEDDING_DIMENSION } from '../shared/config.js';
 
-const ZERO_VECTOR = new Array(EMBEDDING_DIMENSION).fill(0);
+// Pinecone rejects an all-zero dense vector ("must contain at least one non-zero value"), so this
+// bookkeeping record (never used for similarity search - see the `type: "ingestion_state"`
+// exclusion filters) uses a single placeholder 1 instead of a true zero vector.
+const PLACEHOLDER_VECTOR = new Array(EMBEDDING_DIMENSION).fill(0);
+PLACEHOLDER_VECTOR[0] = 1;
 
 /** Deterministic id for the single bookkeeping vector that tracks `repo`'s last-ingested commit. */
 function stateId(repo) {
@@ -27,8 +31,9 @@ export async function setIngestionState(repo, sha, namespace = 'default') {
   await index.namespace(namespace).upsert([
     {
       id: stateId(repo),
-      values: ZERO_VECTOR,
+      values: PLACEHOLDER_VECTOR,
       metadata: { repo, type: 'ingestion_state', lastSha: sha, updatedAt: new Date().toISOString() },
     },
   ]);
 }
+

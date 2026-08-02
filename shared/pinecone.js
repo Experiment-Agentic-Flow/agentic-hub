@@ -49,9 +49,12 @@ export async function deleteRecords(ids, namespace = 'default') {
  */
 export async function pruneStale(repo, currentRunId, namespace = 'default') {
   const index = await getIndex();
-  const zeroVector = new Array(EMBEDDING_DIMENSION).fill(0);
+  // Pinecone rejects an all-zero query vector ("must contain at least one non-zero value") - the
+  // actual value doesn't affect which vectors match the `filter` below, only their ranking.
+  const placeholderVector = new Array(EMBEDDING_DIMENSION).fill(0);
+  placeholderVector[0] = 1;
   const result = await index.namespace(namespace).query({
-    vector: zeroVector,
+    vector: placeholderVector,
     topK: 1000,
     filter: { repo: { $eq: repo }, type: { $ne: 'ingestion_state' } },
     includeMetadata: true,
