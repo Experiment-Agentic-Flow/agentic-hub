@@ -117,12 +117,13 @@ ground-truth signal (see the table above) would be:
   slow (one clone + one Copilot CLI exploration per repo, per ticket) and burns Copilot CLI quota
   on repos that were almost certainly never relevant.
 
-RAG's benefit is doing the expensive "understand what every repo actually does" work **once,
-nightly, in advance** — not per-ticket — so that at ticket time, resolving "which repo(s)" is a
-single cheap vector-similarity query instead of an expensive live exploration of the entire org's
-codebase. It turns an O(all repos) problem per ticket into an O(1) semantic lookup, while still
-producing a real, code-grounded answer (not a blind guess) because the nightly ingestion agent
-already read the real source files in advance.
+RAG's benefit is doing the expensive "understand what every repo actually does" work **once, as
+part of that repo's own push** (not per-ticket, and not by re-scanning the whole repo every time —
+see below) — so that at ticket time, resolving "which repo(s)" is a single cheap vector-similarity
+query instead of an expensive live exploration of the entire org's codebase. It turns an O(all
+repos) problem per ticket into an O(1) semantic lookup, while still producing a real, code-grounded
+answer (not a blind guess) because the ingestion agent already read the real, changed source files
+in advance.
 
 ### The two things RAG is used for
 
@@ -148,44 +149,71 @@ context. The actual code changes are always made by a real Copilot CLI coding ag
 (`runCopilotAgent`) with file read/write tools, exploring and editing the real checked-out
 repository.
 
-### How the RAG index is generated (nightly ingestion)
+### How the RAG index is generated (per-repo incremental ingestion)
 
-Entry point: [rag-ingestion/index.js](rag-ingestion/index.js), triggered nightly (03:00 UTC) by
-[.github/workflows/rag-ingestion-cron.yml](.github/workflows/rag-ingestion-cron.yml) (also runnable
-on demand via `workflow_dispatch`, or locally via `npm run ingest`). It reads the repo allowlist
-from [rag-registry.json](rag-registry.json) and processes every entry independently — one repo
-failing doesn't stop the others, but the process exits non-zero if *any* repo failed, so a CI run
-with partial failures shows up as failed rather than silently green.
+Entry point: [rag-ingestion/ingestOnPush.js](rag-ingestion/ingestOnPush.js), run by
+[.github/workflows/rag-ingestion-dispatch.yml](.github/workflows/rag-ingestion-dispatch.yml) in
+**agent-hub itself**. Each target repo carries a tiny trigger-only workflow of its own (e.g.
+`mepworkspace/.github/workflows/rag-ingestion.yml`) that fires on every push to its tracked branch
+(plus a manual `workflow_dispatch` for on-demand runs), but that workflow does no Copilot/Pinecone
+work and holds no such credentials - it only fires a `repository_dispatch` (event type
+`rag-ingest`) at agent-hub with `{ repo, repo_type, event_name, before, after, force_full }`.
+Agent-hub's own workflow receives it, checks out the target repo itself, and passes
+`REPO`/`REPO_TYPE`/`REPO_DIR` (and the `before`/`after` SHAs) to `ingestOnPush.js` as env vars -
+Copilot and Pinecone secrets only ever exist in agent-hub, never in a target repo.
 
-For each repo/project, the pipeline is:
+For each dispatch, the pipeline is:
 
-1. **Clone** — [rag-ingestion/repoClone.js](rag-ingestion/repoClone.js)'s `cloneForAnalysis` does a
-   shallow, blobless clone (`--depth=1 --filter=blob:none`) into a scratch `.tmp/` directory, using
-   `ORG_GITHUB_PAT`.
-2. **Explore the real code** — a **read-only Copilot CLI agent**
-   ([shared/copilotCli.js](shared/copilotCli.js)'s `runCopilotAnalysis`) is pointed at the clone.
-   It's granted the `read` tool (so it can actually open README/manifest/controllers/domain
-   models/config — whatever it decides is relevant) but `write` and `shell` are both denied, since
-   this is analysis only. This is deliberately the same *kind* of exploration the real coding
-   agents do, just without edit permissions — summaries are grounded in the actual codebase, not
-   just a README's claims.
-3. **Summarize into structured JSON** — [rag-ingestion/summarizer.js](rag-ingestion/summarizer.js)
+1. **Work out what changed** — a push event's own `before`/`after` commits are used directly to
+   diff; a manual dispatch has no "before" of its own, so it falls back to whatever commit
+   [rag-ingestion/ingestionState.js](rag-ingestion/ingestionState.js) recorded as last successfully
+   ingested (a small bookkeeping vector in Pinecone, `{repo}::_ingestion-state`,
+   excluded from search/pruning via `type: "ingestion_state"`) — this is also what lets a re-run
+   catch up on any push whose own ingestion run failed. If the resolved range has no actual
+   changes, the run skips entirely — no agent call, no Pinecone write.
+2. **API services stay whole-project** — [rag-ingestion/apiServiceIngestor.js](rag-ingestion/apiServiceIngestor.js)'s
+   `ingestApiServiceFromDir` re-runs one summary over the entire already-checked-out repo whenever
+   anything changed. A single summary call is cheap enough that diffing at file granularity buys
+   nothing here — the whole point of the incremental machinery below is to avoid unnecessary
+   *agent* calls, and an API service only ever needs one.
+3. **Monorepo projects are diffed to just what changed** —
+   [rag-ingestion/monorepoIngestor.js](rag-ingestion/monorepoIngestor.js) reads every project's
+   `project.json` directly (still deliberately bypassing the Nx CLI, for the same CI-fragility
+   reasons as before), then [rag-ingestion/gitDiff.js](rag-ingestion/gitDiff.js)'s changed-file list
+   is mapped to whichever project's declared root is the longest (most specific) matching ancestor
+   path — only those projects get a fresh agent pass, up to `RAG_INGEST_CONCURRENCY` (default 6) in
+   parallel rather than one at a time. Deleted/renamed `project.json` files are detected from the
+   diff directly (`resolveDeletedProjectIds`, reading the old blob via `git show <fromSha>:<path>`
+   to resolve the project's old name) and their vector removed outright, rather than waiting for a
+   full pass to notice they're gone.
+4. **Explore the real code** — for whatever needs re-analysis (the whole API service, or just the
+   affected Nx project(s)), a **read-only Copilot CLI agent**
+   ([shared/copilotCli.js](shared/copilotCli.js)'s `runCopilotAnalysis`) is pointed at the already
+   -checked-out working tree. It's granted the `read` tool (so it can actually open README/manifest/
+   controllers/domain models/config — whatever it decides is relevant) but `write` and `shell` are
+   both denied, since this is analysis only. This is deliberately the same *kind* of exploration
+   the real coding agents do, just without edit permissions — summaries are grounded in the actual
+   codebase, not just a README's claims.
+5. **Summarize into structured JSON** — [rag-ingestion/summarizer.js](rag-ingestion/summarizer.js)
    drives that exploration with one of two prompts, both instructed to return only verifiable facts
    (`"unknown"`/`[]` rather than invented details):
-   - `summarizeApiService({ repo, cwd })` → `{ purpose, techStack, keyModules, dependencies, notablePatterns }`
-     ([rag-ingestion/apiServiceIngestor.js](rag-ingestion/apiServiceIngestor.js)).
+   - `summarizeApiService({ repo, cwd })` → `{ purpose, techStack, keyModules, dependencies, notablePatterns }`.
    - `summarizeMonorepoProject({ repo, projectName, cwd })` → `{ purpose, keyModules, notablePatterns }`,
-     run once per Nx project inside a monorepo, scoped to that project's own subfolder
-     ([rag-ingestion/monorepoIngestor.js](rag-ingestion/monorepoIngestor.js)). Nx projects are first
-     discovered structurally by reading every `project.json` directly (`name`, `root`,
-     `projectType`, `tags`, `implicitDependencies`) — the Nx CLI itself is deliberately never
-     invoked (fragile in CI: peer-dependency conflicts, postinstall permissions, long installs).
-4. **Embed** — the structured summary is flattened into one plain-text block (e.g.
+     run once per *affected* Nx project inside a monorepo, scoped to that project's own subfolder.
+6. **Embed** — the structured summary is flattened into one plain-text block (e.g.
    `Repository: ...\nPurpose: ...\nTech stack: ...\nKey modules: ...\n...`) and embedded via
    [shared/embeddings.js](shared/embeddings.js)'s `embedTexts(texts, 'passage')`.
-5. **Upsert + prune** — [shared/pinecone.js](shared/pinecone.js) upserts the vector + metadata under
-   a deterministic ID, then `pruneStale(repo, runId)` deletes any other vector for that repo whose
-   `runId` doesn't match the current run (i.e. anything no longer produced this run).
+7. **Upsert + record progress** — [shared/pinecone.js](shared/pinecone.js) upserts each project's
+   vector + metadata under a deterministic ID as soon as that project's own summary is ready (not
+   after every project in the batch finishes), deletes any vector ids resolved as
+   genuinely-removed projects, and finally [rag-ingestion/ingestionState.js](rag-ingestion/ingestionState.js)
+   records the commit just ingested so the next dispatch knows where to resume from.
+
+A repo with no prior ingestion state at all (first run ever, or a diff that can't be computed —
+shallow history, force-push, rewritten history) falls back to a full baseline pass over every
+project (`ingestMonorepoFull`), pruning anything stale via `pruneStale(repo, runId)` — incremental
+runs never call `pruneStale`, since they intentionally leave untouched projects alone; they only
+ever delete ids they've specifically identified as removed.
 
 ### What's actually stored
 

@@ -1,4 +1,4 @@
-import { runCopilotAnalysis } from '../shared/copilotCli.js';
+import { runCopilotAnalysis, COPILOT_SUMMARY_MODEL } from '../shared/copilotCli.js';
 
 /**
  * The "auto-healing" step: has the agent actually explore the repo checked out at `cwd` (README,
@@ -28,7 +28,7 @@ Respond with ONLY valid JSON in this exact shape, no prose before or after:
   "notablePatterns": string[]
 }`;
 
-  const text = await runCopilotAnalysis(prompt, { cwd });
+  const text = await runCopilotAnalysis(prompt, { cwd, model: COPILOT_SUMMARY_MODEL });
   const jsonMatch = text.match(/\{[\s\S]*\}/);
 
   try {
@@ -71,7 +71,7 @@ Respond with ONLY valid JSON in this exact shape, no prose before or after:
   "notablePatterns": string[]
 }`;
 
-  const text = await runCopilotAnalysis(prompt, { cwd });
+  const text = await runCopilotAnalysis(prompt, { cwd, model: COPILOT_SUMMARY_MODEL });
   const jsonMatch = text.match(/\{[\s\S]*\}/);
 
   try {

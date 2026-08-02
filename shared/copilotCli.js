@@ -60,9 +60,8 @@ export async function runCopilotAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000 
  * it can actually open real source files (routes/handlers, domain models, configs - whatever it
  * decides is relevant), but write and shell are both denied since this is analysis only, used by
  * rag-ingestion to ground repo/project summaries in the real codebase instead of a pre-fetched
- * README/manifest snippet. Defaults to COPILOT_MODEL (the same strong model used for bugfix/
- * tech-debt implementation) rather than the cheaper summary model - ingestion output quality
- * matters more here than quota usage.
+ * README/manifest snippet. Defaults to COPILOT_MODEL; callers doing high-volume summarization
+ * (e.g. rag-ingestion/summarizer.js) pass `model: COPILOT_SUMMARY_MODEL` explicitly instead.
  */
 export async function runCopilotAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 1000, model = COPILOT_MODEL } = {}) {
   const args = [

@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Central hub for nightly RAG ingestion and autonomous coding agents (bugfix & tech-debt), triggered via Jira -> n8n -> GitHub repository_dispatch.",
+  "description": "Central hub for incremental, per-repo-triggered RAG ingestion and autonomous coding agents (bugfix & tech-debt), triggered via Jira -> n8n -> GitHub repository_dispatch.",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "ingest": "node rag-ingestion/index.js",
+    "ingest:push": "node rag-ingestion/ingestOnPush.js",
     "agent:bugfix": "node agent-logic/bugfix-agent.js",
     "agent:tech-debt": "node agent-logic/tech-debt-agent.js"
   },

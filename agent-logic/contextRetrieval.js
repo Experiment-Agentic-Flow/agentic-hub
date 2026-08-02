@@ -4,7 +4,10 @@ import { queryByVector } from '../shared/pinecone.js';
 /** Re-queries the vector DB (used by n8n originally) for extra architectural context near a repo/path. */
 export async function retrieveRelatedContext(description, repo, topK = 5) {
   const [vector] = await embedTexts([description], 'query');
-  const result = await queryByVector(vector, { topK, filter: { repo: { $eq: repo } } });
+  const result = await queryByVector(vector, {
+    topK,
+    filter: { repo: { $eq: repo }, type: { $ne: 'ingestion_state' } },
+  });
   return (result.matches || []).map((match) => ({
     id: match.id,
     score: match.score,
@@ -25,7 +28,7 @@ export async function resolveCandidatesFromVectorSearch(
   { topK = 8, minScore = 0.65, relativeMargin = 0.08, maxCandidates = 5 } = {}
 ) {
   const [vector] = await embedTexts([description], 'query');
-  const result = await queryByVector(vector, { topK });
+  const result = await queryByVector(vector, { topK, filter: { type: { $ne: 'ingestion_state' } } });
   const matches = (result.matches || [])
     .map((match) => ({ id: match.id, score: match.score, metadata: match.metadata }))
     .sort((a, b) => b.score - a.score);

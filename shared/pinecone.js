@@ -32,9 +32,20 @@ export async function upsertRecords(records, namespace = 'default') {
   }
 }
 
+/** Deletes specific vector ids outright - used by incremental ingestion to drop removed/renamed projects. */
+export async function deleteRecords(ids, namespace = 'default') {
+  if (!ids || ids.length === 0) return;
+  const index = await getIndex();
+  await index.namespace(namespace).deleteMany(ids);
+}
+
 /**
  * Deletes vectors belonging to `repo` whose metadata.runId doesn't match the current run,
- * i.e. anything that no longer exists / wasn't re-embedded in this ingestion pass.
+ * i.e. anything that no longer exists / wasn't re-embedded in this ingestion pass. Only valid
+ * after a *full* pass over the repo (every project re-embedded) - never call this after an
+ * incremental/partial run, since it would delete every project that simply wasn't touched.
+ * The `_ingestion-state` tracking record (see rag-ingestion/ingestionState.js) is excluded, since
+ * it's a bookkeeping vector, not ingested content.
  */
 export async function pruneStale(repo, currentRunId, namespace = 'default') {
   const index = await getIndex();
@@ -42,7 +53,7 @@ export async function pruneStale(repo, currentRunId, namespace = 'default') {
   const result = await index.namespace(namespace).query({
     vector: zeroVector,
     topK: 1000,
-    filter: { repo: { $eq: repo } },
+    filter: { repo: { $eq: repo }, type: { $ne: 'ingestion_state' } },
     includeMetadata: true,
   });
 
