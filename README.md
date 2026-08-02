@@ -134,6 +134,10 @@ to run first.
 4. Add the same values as GitHub Actions **secrets** (`COPILOT_GITHUB_TOKEN`, `PINECONE_API_KEY`, `ORG_GITHUB_PAT`,
    `JIRA_EMAIL`, `JIRA_API_TOKEN`) and **variables** (`COPILOT_MODEL`, `PINECONE_INDEX`, `PINECONE_EMBEDDING_MODEL`, `JIRA_BASE_URL`) on this repo.
    `COPILOT_GITHUB_TOKEN` should be a PAT (fine-grained or classic) with the "Copilot Requests" permission enabled.
+   All of these can be defined once as **organization-level** secrets/variables instead of per-repo - just make sure
+   each org secret/variable's repository access includes agentic-hub (and, for `ORG_GITHUB_PAT`, every target repo too);
+   `${{ secrets.X }}` / `${{ vars.X }}` resolve org-level values automatically with no workflow syntax changes. A
+   repo-level secret/variable of the same name always takes precedence over the org-level one.
 5. `ORG_GITHUB_PAT` must be an organization-level PAT (or GitHub App installation token) with `repo` and `pull_request` scope
    across every target repository - agentic-hub's own ingestion workflow uses it to check out a target repo when a
    `rag-ingest` dispatch arrives, and agent-logic uses it to look up a candidate repo's default branch via the GitHub API.
