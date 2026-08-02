@@ -114,13 +114,17 @@ export async function ingestMonorepoProjects({ repo, repoDir, projectNames }, ru
 
   const concurrency = Number(process.env.RAG_INGEST_CONCURRENCY) || DEFAULT_CONCURRENCY;
   let completed = 0;
+  console.log(`  analyzing ${projectsToBuild.length} project(s) with concurrency=${concurrency}`);
 
   return mapWithConcurrency(projectsToBuild, concurrency, async ({ projectName, node }) => {
     node.projectDir = path.resolve(repoDir, node.data.root || '.');
+    console.log(`  -> started ${projectName}`);
+    const startedAt = Date.now();
     const record = await buildProjectRecord({ repo, projectName, node }, runId);
     await upsertRecords([record]);
     completed += 1;
-    console.log(`  [${completed}/${projectsToBuild.length}] analyzed + upserted ${projectName}`);
+    const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+    console.log(`  [${completed}/${projectsToBuild.length}] analyzed + upserted ${projectName} (${seconds}s)`);
     return record;
   });
 }
