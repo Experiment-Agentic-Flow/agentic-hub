@@ -103,6 +103,7 @@ completely untouched.`,
   for (const candidate of candidates) {
     const pushed = await commitAndPush(
       candidateDirs[candidate.repo],
+      candidate.repo,
       branchName,
       `${result.commitMessage}\n\nFixes ${TICKET_KEY}`
     );
