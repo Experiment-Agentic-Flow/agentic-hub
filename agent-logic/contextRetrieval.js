@@ -19,9 +19,12 @@ export async function retrieveRelatedContext(description, repo, topK = 5) {
  * Finds the "appropriate" candidate repos for a ticket that doesn't specify one directly, purely
  * from vector-DB similarity - no LLM guessing from metadata alone. The candidate count is
  * adaptive, not a fixed number: the top match is always included, and subsequent matches are only
- * kept if they're close enough in score to be genuinely competitive (and dedupe to one entry per
- * repo). The actual choice of *which* candidate to modify is deferred to the coding agent, which
- * can inspect the real checked-out code rather than just text summaries.
+ * kept if they're close enough in score to be genuinely competitive. Candidates dedupe to one
+ * entry *per repo*, but a monorepo can have several genuinely relevant Nx projects for a single
+ * ticket - every competitive match for the same repo contributes its own `projectPath` into that
+ * repo's `paths` list, rather than only the single best-scoring project surviving. The actual
+ * choice of *which* candidate/path to modify is deferred to the coding agent, which can inspect
+ * the real checked-out code rather than just text summaries.
  */
 export async function resolveCandidatesFromVectorSearch(
   description,
@@ -38,23 +41,35 @@ export async function resolveCandidatesFromVectorSearch(
   }
 
   const topScore = matches[0].score;
-  const seenRepos = new Set();
-  const candidates = [];
+  const byRepo = new Map();
 
   for (const match of matches) {
     const repo = match.metadata?.repo;
-    if (!repo || seenRepos.has(repo)) continue;
+    if (!repo) continue;
     if (match.score < minScore && match !== matches[0]) continue;
     if (match.score < topScore - relativeMargin) continue;
 
-    seenRepos.add(repo);
-    candidates.push(match);
-    if (candidates.length >= maxCandidates) break;
+    if (!byRepo.has(repo)) {
+      if (byRepo.size >= maxCandidates) continue; // caps distinct repos, not paths within one repo
+      byRepo.set(repo, { repo, score: match.score, paths: [] });
+    }
+    const projectPath = match.metadata?.projectPath;
+    const candidate = byRepo.get(repo);
+    if (projectPath && !candidate.paths.includes(projectPath)) {
+      candidate.paths.push(projectPath);
+    }
   }
+
+  const candidates = [...byRepo.values()];
 
   // Always surface at least the single best match, even if it's below the usual thresholds.
   if (candidates.length === 0) {
-    candidates.push(matches[0]);
+    const best = matches[0];
+    candidates.push({
+      repo: best.metadata?.repo,
+      score: best.score,
+      paths: best.metadata?.projectPath ? [best.metadata.projectPath] : [],
+    });
   }
 
   return candidates;

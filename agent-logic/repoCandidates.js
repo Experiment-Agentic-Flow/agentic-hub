@@ -24,11 +24,13 @@ async function resolveBranch(repo, targetBranch) {
  *      coding agent decides between them after inspecting the actual checked-out code, rather
  *      than us guessing from metadata alone.
  *
- * Returns an array of { repo, branch, path, source } - never empty unless nothing at all matched.
+ * Returns an array of { repo, branch, paths, source } - `paths` is an array since a single
+ * monorepo candidate can have several genuinely relevant project paths for one ticket, not just
+ * one - never empty unless nothing at all matched.
  */
 export async function gatherCandidates({ ticketKey, ticketType, description, targetRepo, targetBranch, targetPath }) {
   if (targetRepo) {
-    return [{ repo: targetRepo, branch: targetBranch || 'main', path: targetPath || '.', source: 'explicit' }];
+    return [{ repo: targetRepo, branch: targetBranch || 'main', paths: [targetPath || '.'], source: 'explicit' }];
   }
 
   if (ticketType === 'bugfix-ticket') {
@@ -38,7 +40,7 @@ export async function gatherCandidates({ ticketKey, ticketType, description, tar
         parents.map(async (p) => ({
           repo: p.repo,
           branch: await resolveBranch(p.repo, targetBranch),
-          path: '.',
+          paths: ['.'],
           source: `${p.source} (${p.parentKey})`,
         }))
       );
@@ -48,9 +50,9 @@ export async function gatherCandidates({ ticketKey, ticketType, description, tar
   const matches = await resolveCandidatesFromVectorSearch(description);
   return Promise.all(
     matches.map(async (match) => ({
-      repo: match.metadata?.repo,
-      branch: await resolveBranch(match.metadata?.repo, targetBranch),
-      path: match.metadata?.projectPath || '.',
+      repo: match.repo,
+      branch: await resolveBranch(match.repo, targetBranch),
+      paths: match.paths.length ? match.paths : ['.'],
       source: `vector search (score ${match.score.toFixed(3)})`,
     }))
   );

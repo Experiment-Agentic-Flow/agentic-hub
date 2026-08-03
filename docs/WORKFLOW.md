@@ -134,10 +134,14 @@ Both consumers live in [agent-logic/contextRetrieval.js](agent-logic/contextRetr
    above). Embeds the ticket description as a `'query'` vector, searches the index, and returns an
    *adaptive* set of candidates: the top match is always included; further matches are only added
    if they're close enough in score to be genuinely competitive (`minScore: 0.65`,
-   `relativeMargin: 0.08`, capped at `maxCandidates: 5`). This can return **one** repo (clear
-   winner) or **several** (multiple plausible matches) — the final choice of which repo(s) to
-   actually modify is deferred to the coding agent once it can see the real checked-out code, not
-   decided by vector score alone.
+   `relativeMargin: 0.08`, capped at `maxCandidates: 5`, which limits distinct **repos**, not paths
+   within one repo). This can return **one** repo (clear winner) or **several** (multiple plausible
+   matches) — the final choice of which repo(s)/path(s) to actually modify is deferred to the
+   coding agent once it can see the real checked-out code, not decided by vector score alone. A
+   single monorepo candidate carries a `paths` array, not just one path: every competitive Nx
+   project match for that repo contributes its own `projectPath`, since one ticket can genuinely
+   span several libs in the same monorepo - the coding agent only gets hard-scoped to a single
+   directory when exactly one project matched.
 2. **Related architectural context** — `retrieveRelatedContext(description, repo)`, called from
    [agent-logic/tech-debt-agent.js](agent-logic/tech-debt-agent.js) only (single-candidate case):
    once the target repo is known, this re-queries the index filtered to that repo and feeds the
