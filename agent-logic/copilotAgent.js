@@ -1,4 +1,5 @@
 import { runCopilotAgent } from '../shared/copilotCli.js';
+import { loadPrompt } from '../shared/promptTemplate.js';
 
 /**
  * Delegates the coding task to the GitHub Copilot CLI, scoped to rootDir. Copilot CLI has its
@@ -14,13 +15,11 @@ export async function runAgentLoop({ rootDir, systemPrompt, task, extraResponseF
     ...extraResponseFields,
   };
 
-  const prompt = `${systemPrompt}
-
-${task}
-
-Make all necessary file changes directly in the current working directory using your file tools.
-When you are completely done, respond with ONLY a single JSON object (no other text, no markdown fences) in this exact shape:
-${JSON.stringify(responseShape)}`;
+  const prompt = loadPrompt('agent-response-wrapper', {
+    SYSTEM_PROMPT: systemPrompt,
+    TASK: task,
+    RESPONSE_SHAPE: JSON.stringify(responseShape),
+  });
 
   const text = await runCopilotAgent(prompt, { cwd: rootDir });
   const jsonMatch = text.match(/\{[\s\S]*\}/);

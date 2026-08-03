@@ -2,20 +2,20 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { runAgentLoop } from './copilotAgent.js';
-import { createBranch, commitAndPush } from './git.js';
+import { createBranch, commitAndPush, hasChanges } from './git.js';
 import { openPullRequest, findExistingPullRequest } from './githubPr.js';
 import { addJiraComment } from './jira.js';
 import { retrieveRelatedContext } from './contextRetrieval.js';
 import { gatherCandidates } from './repoCandidates.js';
 import { cloneCandidate, sanitizeRepoDirName } from './repoWorkspace.js';
 import { formatUsageSummary } from '../shared/copilotCli.js';
+import { validateChanges } from './validate.js';
+import { loadPrompt } from '../shared/promptTemplate.js';
 
 async function main() {
   const {
     TICKET_KEY,
     TICKET_DESCRIPTION,
-    TARGET_REPO,
-    TARGET_PATH,
     TARGET_BRANCH,
     WORKSPACE_DIR = path.resolve('workspace'),
   } = process.env;
@@ -26,15 +26,13 @@ async function main() {
 
   const branchName = `task/${TICKET_KEY.toLowerCase()}`;
 
-  // Tech-debt tickets have no parent ticket to fall back on - candidates always come from either
-  // an explicit target repo or a vector-DB search.
+  // Tech-debt tickets have no parent ticket to fall back on - candidates always come from a
+  // vector-DB search.
   let candidates = await gatherCandidates({
     ticketKey: TICKET_KEY,
     ticketType: 'tech-debt-ticket',
     description: TICKET_DESCRIPTION,
-    targetRepo: TARGET_REPO,
     targetBranch: TARGET_BRANCH,
-    targetPath: TARGET_PATH,
   });
 
   if (candidates.length === 0) {
@@ -96,8 +94,7 @@ async function main() {
       const scopedRoot = path.resolve(candidateDirs[chosenRepo], onlyPath);
       result = await runAgentLoop({
         rootDir: scopedRoot,
-        systemPrompt: `You are an autonomous senior software engineer paying down tech debt in ${chosenRepo}, scoped strictly to path "${onlyPath}".
-Use the provided tools to explore only this scope and apply a focused refactor. Do not touch files outside this scope.`,
+        systemPrompt: loadPrompt('tech-debt-single-path', { REPO: chosenRepo, PATH: onlyPath }),
         task: `Tech debt ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${contextBlock}`,
       });
     } else {
@@ -111,7 +108,7 @@ refactor inside every path that genuinely applies, and leave unrelated parts of 
         : '';
       result = await runAgentLoop({
         rootDir: candidateDirs[chosenRepo],
-        systemPrompt: `You are an autonomous senior software engineer paying down tech debt in ${chosenRepo}.${pathsBlock}`,
+        systemPrompt: loadPrompt('tech-debt-multi-path', { REPO: chosenRepo, PATHS_BLOCK: pathsBlock }),
         task: `Tech debt ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${contextBlock}`,
       });
     }
@@ -126,14 +123,7 @@ refactor inside every path that genuinely applies, and leave unrelated parts of 
 
     result = await runAgentLoop({
       rootDir: WORKSPACE_DIR,
-      systemPrompt: `You are an autonomous senior software engineer. It isn't yet certain which repository this tech-debt
-ticket belongs to, so several candidates have been checked out as subfolders of the current working directory:
-${candidateList}
-
-Inspect each candidate's code. This ticket may target ONLY ONE of these repos, or it may describe a cross-cutting
-cleanup that applies to SEVERAL of them (e.g. the same pattern duplicated across services). Apply a focused refactor
-inside the subfolder of EVERY repo (and, for monorepos, the specific project path within it) the ticket genuinely
-applies to, and leave every other candidate completely untouched.`,
+      systemPrompt: loadPrompt('tech-debt-multi-repo', { CANDIDATE_LIST: candidateList }),
       task: `Tech debt ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}`,
     });
   }
@@ -142,7 +132,28 @@ applies to, and leave every other candidate completely untouched.`,
   // candidate's actual git status - that way a cleanup that legitimately spans multiple repos
   // gets a PR in each of them, and repos the agent left untouched are correctly skipped.
   const openedPrs = [];
+  const failedValidations = [];
   for (const candidate of candidates) {
+    if (!(await hasChanges(candidateDirs[candidate.repo]))) {
+      console.log(`No changes were made by the agent in ${candidate.repo}; skipping PR creation.`);
+      fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
+      continue;
+    }
+
+    // .NET repos only - run the real test suite before committing/pushing, so a broken build
+    // never reaches a PR (Nx/Node repos are skipped here, see validate.js).
+    const validation = await validateChanges(candidateDirs[candidate.repo]);
+    if (validation.skipped) {
+      console.log(`Skipping test validation for ${candidate.repo}: ${validation.reason}`);
+    } else if (!validation.passed) {
+      console.error(`Tests failed for ${candidate.repo}; not opening a PR:\n${validation.output}`);
+      failedValidations.push({ repo: candidate.repo, output: validation.output });
+      fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
+      continue;
+    } else {
+      console.log(`Tests passed for ${candidate.repo}.`);
+    }
+
     const pushed = await commitAndPush(
       candidateDirs[candidate.repo],
       candidate.repo,
@@ -175,10 +186,13 @@ applies to, and leave every other candidate completely untouched.`,
   }
 
   const prSummaryLines = openedPrs.map((p) => `- ${p.repo} (${p.paths.join(', ')}): ${p.prUrl}`).join('\n');
+  const failureLines = failedValidations.map((f) => `- ${f.repo}: tests failed, no PR opened`).join('\n');
   console.log(formatUsageSummary());
   await addJiraComment(
     TICKET_KEY,
-    `agent-hub opened the following tech-debt cleanup PR(s) for this ticket:\n${prSummaryLines}\n\n${formatUsageSummary()}`
+    `agent-hub opened the following tech-debt cleanup PR(s) for this ticket:\n${prSummaryLines}` +
+      (failureLines ? `\n\nTests failed for other candidate(s), no PR opened:\n${failureLines}` : '') +
+      `\n\n${formatUsageSummary()}`
   );
 }
 

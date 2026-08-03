@@ -2,18 +2,19 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { runAgentLoop } from './copilotAgent.js';
-import { createBranch, commitAndPush } from './git.js';
+import { createBranch, commitAndPush, hasChanges } from './git.js';
 import { openPullRequest, findExistingPullRequest } from './githubPr.js';
 import { addJiraComment } from './jira.js';
 import { gatherCandidates } from './repoCandidates.js';
 import { cloneCandidate, sanitizeRepoDirName } from './repoWorkspace.js';
 import { formatUsageSummary } from '../shared/copilotCli.js';
+import { validateChanges } from './validate.js';
+import { loadPrompt } from '../shared/promptTemplate.js';
 
 async function main() {
   const {
     TICKET_KEY,
     TICKET_DESCRIPTION,
-    TARGET_REPO,
     TARGET_BRANCH,
     WORKSPACE_DIR = path.resolve('workspace'),
   } = process.env;
@@ -28,7 +29,6 @@ async function main() {
     ticketKey: TICKET_KEY,
     ticketType: 'bugfix-ticket',
     description: TICKET_DESCRIPTION,
-    targetRepo: TARGET_REPO,
     targetBranch: TARGET_BRANCH,
   });
 
@@ -72,9 +72,7 @@ async function main() {
     console.log(`Running bugfix agent for ${TICKET_KEY} on ${chosenRepo}`);
     result = await runAgentLoop({
       rootDir: candidateDirs[chosenRepo],
-      systemPrompt: `You are an autonomous senior software engineer fixing a bug in repository ${chosenRepo}.
-Use the provided tools to explore the codebase, locate the root cause, and apply the minimal correct fix.
-Do not make unrelated changes. When finished, call the "finish" tool.`,
+      systemPrompt: loadPrompt('bugfix-single-repo', { REPO: chosenRepo }),
       task: `Bug ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}`,
     });
   } else {
@@ -85,14 +83,7 @@ Do not make unrelated changes. When finished, call the "finish" tool.`,
 
     result = await runAgentLoop({
       rootDir: WORKSPACE_DIR,
-      systemPrompt: `You are an autonomous senior software engineer. It isn't yet certain which repository this bug
-ticket belongs to, so several candidates have been checked out as subfolders of the current working directory:
-${candidateList}
-
-Inspect each candidate's code. This bug may belong to ONLY ONE of these repos, or it may require a coordinated fix
-across SEVERAL of them (e.g. a shared contract or API change that affects more than one service). Apply the minimal
-correct fix inside the subfolder of EVERY repo the ticket genuinely applies to, and leave every other candidate
-completely untouched.`,
+      systemPrompt: loadPrompt('bugfix-multi-repo', { CANDIDATE_LIST: candidateList }),
       task: `Bug ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}`,
     });
   }
@@ -101,7 +92,28 @@ completely untouched.`,
   // candidate's actual git status - that way a fix that legitimately spans multiple repos gets a
   // PR in each of them, and repos the agent left untouched are correctly skipped.
   const openedPrs = [];
+  const failedValidations = [];
   for (const candidate of candidates) {
+    if (!(await hasChanges(candidateDirs[candidate.repo]))) {
+      console.log(`No changes were made by the agent in ${candidate.repo}; skipping PR creation.`);
+      fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
+      continue;
+    }
+
+    // .NET repos only - run the real test suite before committing/pushing, so a broken build
+    // never reaches a PR (Nx/Node repos are skipped here, see validate.js).
+    const validation = await validateChanges(candidateDirs[candidate.repo]);
+    if (validation.skipped) {
+      console.log(`Skipping test validation for ${candidate.repo}: ${validation.reason}`);
+    } else if (!validation.passed) {
+      console.error(`Tests failed for ${candidate.repo}; not opening a PR:\n${validation.output}`);
+      failedValidations.push({ repo: candidate.repo, output: validation.output });
+      fs.rmSync(candidateDirs[candidate.repo], { recursive: true, force: true });
+      continue;
+    } else {
+      console.log(`Tests passed for ${candidate.repo}.`);
+    }
+
     const pushed = await commitAndPush(
       candidateDirs[candidate.repo],
       candidate.repo,
@@ -134,10 +146,13 @@ completely untouched.`,
   }
 
   const prSummaryLines = openedPrs.map((p) => `- ${p.repo}: ${p.prUrl}`).join('\n');
+  const failureLines = failedValidations.map((f) => `- ${f.repo}: tests failed, no PR opened`).join('\n');
   console.log(formatUsageSummary());
   await addJiraComment(
     TICKET_KEY,
-    `agent-hub opened the following fix PR(s) for this ticket:\n${prSummaryLines}\n\n${formatUsageSummary()}`
+    `agent-hub opened the following fix PR(s) for this ticket:\n${prSummaryLines}` +
+      (failureLines ? `\n\nTests failed for other candidate(s), no PR opened:\n${failureLines}` : '') +
+      `\n\n${formatUsageSummary()}`
   );
 }
 

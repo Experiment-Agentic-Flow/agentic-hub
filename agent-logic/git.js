@@ -6,6 +6,12 @@ export async function createBranch(workingDir, branchName) {
   return git;
 }
 
+/** Whether the agent actually changed anything in workingDir (staged or not, tracked or new). */
+export async function hasChanges(workingDir) {
+  const status = await simpleGit(workingDir).status();
+  return status.staged.length > 0 || status.files.length > 0;
+}
+
 /**
  * Stages, commits, and pushes all changes in workingDir. Returns false if there was nothing to commit.
  * `repo` ("owner/name") is used to inject the org PAT into the origin URL just for the push - the

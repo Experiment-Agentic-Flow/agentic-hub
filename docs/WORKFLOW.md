@@ -23,8 +23,6 @@ classifyTicketType(): "User Story Bug" → bugfix   |   "Technical Debt" → tec
         ▼
 agent-logic/repoCandidates.js gatherCandidates()
         │
-        ├─ explicit TARGET_REPO given? ──────────────────────────► use it directly (no RAG)
-        │
         ├─ bugfix ticket, parent's linked PR/branch found? ──────► use that repo (no RAG — see below)
         │
         └─ otherwise (tech-debt always; bugfix with no parent match)
@@ -56,18 +54,17 @@ the issue type to an automation category: **"User Story Bug"** (a subtask type) 
 [agent-logic/repoCandidates.js](agent-logic/repoCandidates.js)'s `gatherCandidates()` then resolves
 which repo(s) the ticket targets, in priority order:
 
-1. **Explicit `TARGET_REPO`** (env var / matrix entry) always wins outright.
-2. **Bugfix tickets**: every repo referenced by the Jira **parent** ticket's linked GitHub PRs
+1. **Bugfix tickets**: every repo referenced by the Jira **parent** ticket's linked GitHub PRs
    *and* branches (via Jira's Development panel / dev-status API,
    [agent-logic/jira.js](agent-logic/jira.js)'s `resolveTargetReposFromParent`) — a parent
    story/epic can span several repos, so all of them become candidates.
-3. **Otherwise** (tech-debt always; bugfix only when step 2 found nothing): an adaptive set of
+2. **Otherwise** (tech-debt always; bugfix only when step 1 found nothing): an adaptive set of
    candidates from a RAG vector-DB search — see [RAG in this workflow](#rag-in-this-workflow) below.
 
 ### Bugfix tickets resolved via a parent ticket do not use RAG at all
 
 This is intentional, and worth calling out explicitly since it's easy to assume RAG is always in
-the loop. If step 2 above finds any repos, those are used directly —
+the loop. If step 1 above finds any repos, those are used directly —
 `resolveCandidatesFromVectorSearch` (RAG) is never called for this ticket. Separately,
 [agent-logic/bugfix-agent.js](agent-logic/bugfix-agent.js) never calls `retrieveRelatedContext()`
 either (that's only wired into [agent-logic/tech-debt-agent.js](agent-logic/tech-debt-agent.js)).
@@ -82,7 +79,6 @@ worse — slower, and with a (small but nonzero) chance of picking the wrong rep
 
 | Ticket path | Repo resolution | RAG used? |
 |---|---|---|
-| Explicit `TARGET_REPO` env var | Direct | No |
 | Bugfix, parent ticket has linked PR(s)/branch(es) | Jira dev-status API | **No** |
 | Bugfix, parent ticket has no linked activity yet | Vector search | Yes (candidate resolution only) |
 | Tech-debt (always — no parent ticket concept) | Vector search | Yes (candidate resolution **and** related-context) |

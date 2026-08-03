@@ -15,10 +15,9 @@ async function resolveBranch(repo, targetBranch) {
 
 /**
  * Gathers the candidate repo(s) a ticket might target, in priority order:
- *   1. An explicit target repo (from the payload / matrix entry) always wins outright.
- *   2. Bugfix tickets: every repo referenced by the Jira parent ticket's linked PRs/branches - a
+ *   1. Bugfix tickets: every repo referenced by the Jira parent ticket's linked PRs/branches - a
  *      parent story/epic can span several repos, so all of them become candidates.
- *   3. Otherwise (tech-debt always, bugfix without a resolvable parent): the vector DB surfaces
+ *   2. Otherwise (tech-debt always, bugfix without a resolvable parent): the vector DB surfaces
  *      an adaptive set of "appropriate" candidate repos, each using its actual GitHub default
  *      branch. Multiple repos may come back if several are genuinely competitive matches - the
  *      coding agent decides between them after inspecting the actual checked-out code, rather
@@ -28,11 +27,7 @@ async function resolveBranch(repo, targetBranch) {
  * monorepo candidate can have several genuinely relevant project paths for one ticket, not just
  * one - never empty unless nothing at all matched.
  */
-export async function gatherCandidates({ ticketKey, ticketType, description, targetRepo, targetBranch, targetPath }) {
-  if (targetRepo) {
-    return [{ repo: targetRepo, branch: targetBranch || 'main', paths: [targetPath || '.'], source: 'explicit' }];
-  }
-
+export async function gatherCandidates({ ticketKey, ticketType, description, targetBranch }) {
   if (ticketType === 'bugfix-ticket') {
     const parents = await resolveTargetReposFromParent(ticketKey);
     if (parents.length > 0) {

@@ -161,6 +161,6 @@ to run first.
 
 ```bash
 npm run ingest:push      # incremental ingestion for one already-checked-out repo (requires REPO, REPO_TYPE, REPO_DIR env vars)
-npm run agent:bugfix     # run the bugfix agent (requires TICKET_KEY, TICKET_DESCRIPTION; TARGET_REPO/WORKSPACE_DIR optional)
-npm run agent:tech-debt  # run the tech-debt agent (also accepts an optional TARGET_PATH)
+npm run agent:bugfix     # run the bugfix agent (requires TICKET_KEY, TICKET_DESCRIPTION; TARGET_BRANCH/WORKSPACE_DIR optional)
+npm run agent:tech-debt  # run the tech-debt agent (repo/path are always resolved via RAG - see the ticket lifecycle above)
 ```
