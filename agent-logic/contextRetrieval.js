@@ -46,8 +46,12 @@ export async function resolveCandidatesFromVectorSearch(
   for (const match of matches) {
     const repo = match.metadata?.repo;
     if (!repo) continue;
-    if (match.score < minScore && match !== matches[0]) continue;
-    if (match.score < topScore - relativeMargin) continue;
+    // A match is competitive if it clears the absolute floor OR is close enough to the top score -
+    // these must be checked as alternatives, not both required: whenever the top match itself is a
+    // middling score (below minScore), every other match is guaranteed to score even lower, so
+    // requiring the absolute floor on top of the relative check would make it impossible for any
+    // additional candidate to ever qualify.
+    if (match.score < minScore && match.score < topScore - relativeMargin) continue;
 
     if (!byRepo.has(repo)) {
       if (byRepo.size >= maxCandidates) continue; // caps distinct repos, not paths within one repo
