@@ -8,6 +8,7 @@ import { addJiraComment } from './jira.js';
 import { retrieveRelatedContext } from './contextRetrieval.js';
 import { gatherCandidates } from './repoCandidates.js';
 import { cloneCandidate, sanitizeRepoDirName } from './repoWorkspace.js';
+import { formatUsageSummary } from '../shared/copilotCli.js';
 
 async function main() {
   const {
@@ -169,13 +170,15 @@ applies to, and leave every other candidate completely untouched.`,
 
   if (openedPrs.length === 0) {
     console.log(`No changes were made by the agent in any candidate repo for ${TICKET_KEY}; skipping PR creation.`);
+    console.log(formatUsageSummary());
     return;
   }
 
   const prSummaryLines = openedPrs.map((p) => `- ${p.repo} (${p.paths.join(', ')}): ${p.prUrl}`).join('\n');
+  console.log(formatUsageSummary());
   await addJiraComment(
     TICKET_KEY,
-    `agent-hub opened the following tech-debt cleanup PR(s) for this ticket:\n${prSummaryLines}`
+    `agent-hub opened the following tech-debt cleanup PR(s) for this ticket:\n${prSummaryLines}\n\n${formatUsageSummary()}`
   );
 }
 

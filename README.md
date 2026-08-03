@@ -124,7 +124,11 @@ to run first.
    its own branch pushed and its own PR opened ([agent-logic/githubPr.js](agent-logic/githubPr.js)); repos the agent left
    untouched are skipped and their local clone is removed. A single Jira comment then lists the PR link for every repo
    that got one ([agent-logic/jira.js](agent-logic/jira.js)) — so a multi-repo ticket ends up with one comment listing
-   every PR, not just one.
+   every PR, not just one. That comment also includes an AI usage line
+   ([shared/copilotCli.js](shared/copilotCli.js)'s `formatUsageSummary`) — the number of Copilot CLI calls made for
+   that ticket, broken down by model, plus total wall-clock time. GitHub tracks the actual premium-request/credit
+   billing centrally (not exposed per-call via the CLI), so this call-count/model/duration breakdown is the closest
+   proxy agent-hub can report itself for how much AI usage a ticket consumed.
 
 ## Setup
 
