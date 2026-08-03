@@ -8,7 +8,6 @@ import { addJiraComment } from './jira.js';
 import { retrieveRelatedContext } from './contextRetrieval.js';
 import { gatherCandidates } from './repoCandidates.js';
 import { cloneCandidate, sanitizeRepoDirName } from './repoWorkspace.js';
-import { formatUsageSummary } from '../shared/copilotCli.js';
 import { validateChanges } from './validate.js';
 import { loadPrompt } from '../shared/promptTemplate.js';
 
@@ -181,18 +180,15 @@ refactor inside every path that genuinely applies, and leave unrelated parts of 
 
   if (openedPrs.length === 0) {
     console.log(`No changes were made by the agent in any candidate repo for ${TICKET_KEY}; skipping PR creation.`);
-    console.log(formatUsageSummary());
     return;
   }
 
   const prSummaryLines = openedPrs.map((p) => `- ${p.repo} (${p.paths.join(', ')}): ${p.prUrl}`).join('\n');
   const failureLines = failedValidations.map((f) => `- ${f.repo}: tests failed, no PR opened`).join('\n');
-  console.log(formatUsageSummary());
   await addJiraComment(
     TICKET_KEY,
     `agent-hub opened the following tech-debt cleanup PR(s) for this ticket:\n${prSummaryLines}` +
-      (failureLines ? `\n\nTests failed for other candidate(s), no PR opened:\n${failureLines}` : '') +
-      `\n\n${formatUsageSummary()}`
+      (failureLines ? `\n\nTests failed for other candidate(s), no PR opened:\n${failureLines}` : '')
   );
 }
 

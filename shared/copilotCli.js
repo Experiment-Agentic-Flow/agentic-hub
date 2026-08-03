@@ -11,48 +11,6 @@ export const COPILOT_MODEL = process.env.COPILOT_MODEL || 'claude-sonnet-5';
 // Summarization is a cheap, low-reasoning task, so default it to a fast/low-cost model.
 export const COPILOT_SUMMARY_MODEL = process.env.COPILOT_SUMMARY_MODEL || 'claude-haiku-4.5';
 
-// Each agent-logic script (bugfix-agent.js, tech-debt-agent.js, ...) runs as its own process per
-// ticket, so this module-level log naturally scopes to "every Copilot CLI call made for this
-// ticket run" without threading a tracking object through every function call. There's no exact
-// token/dollar cost available from the CLI itself - GitHub tracks premium-request billing
-// centrally, not per stdout call - so call count + model + duration is the best proxy we can
-// report ourselves for how much AI usage a ticket actually consumed.
-const callLog = [];
-
-function recordCall(kind, model, durationMs) {
-  callLog.push({ kind, model, durationMs });
-}
-
-/** Every Copilot CLI call made so far in this process, summarized by kind/model - see `formatUsageSummary`. */
-export function getUsageSummary() {
-  const byModel = {};
-  for (const call of callLog) {
-    const key = call.model || 'unknown';
-    byModel[key] = (byModel[key] || 0) + 1;
-  }
-  return {
-    totalCalls: callLog.length,
-    byModel,
-    totalDurationMs: callLog.reduce((sum, call) => sum + call.durationMs, 0),
-  };
-}
-
-/** Renders `getUsageSummary()` as a single human-readable line for logs/Jira comments. */
-export function formatUsageSummary() {
-  const { totalCalls, byModel, totalDurationMs } = getUsageSummary();
-  if (totalCalls === 0) return 'AI usage: no Copilot CLI calls made.';
-
-  const byModelText = Object.entries(byModel)
-    .map(([model, count]) => `${model}: ${count}`)
-    .join(', ');
-  const totalSeconds = Math.round(totalDurationMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const durationText = minutes > 0 ? `${minutes}m${seconds}s` : `${seconds}s`;
-
-  return `AI usage: ${totalCalls} Copilot CLI call(s) - ${byModelText} (total ${durationText})`;
-}
-
 /**
  * Runs `copilot` non-interactively as a pure text generator: shell and file-write tools are
  * denied, since all context is passed directly in the prompt. Use for summarization/classification.
@@ -61,17 +19,12 @@ export async function runCopilotPrompt(prompt, { timeoutMs = 5 * 60 * 1000, mode
   const args = ['-p', prompt, '-s', '--no-ask-user', '--deny-tool=shell', '--deny-tool=write'];
   if (model) args.push('--model', model);
 
-  const startedAt = Date.now();
-  try {
-    const { stdout } = await execFileAsync('copilot', args, {
-      maxBuffer: 1024 * 1024 * 32,
-      timeout: timeoutMs,
-      env: process.env,
-    });
-    return stdout.trim();
-  } finally {
-    recordCall('prompt', model, Date.now() - startedAt);
-  }
+  const { stdout } = await execFileAsync('copilot', args, {
+    maxBuffer: 1024 * 1024 * 32,
+    timeout: timeoutMs,
+    env: process.env,
+  });
+  return stdout.trim();
 }
 
 /**
@@ -93,18 +46,13 @@ export async function runCopilotAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000 
   ];
   if (COPILOT_MODEL) args.push('--model', COPILOT_MODEL);
 
-  const startedAt = Date.now();
-  try {
-    const { stdout } = await execFileAsync('copilot', args, {
-      cwd,
-      maxBuffer: 1024 * 1024 * 64,
-      timeout: timeoutMs,
-      env: process.env,
-    });
-    return stdout.trim();
-  } finally {
-    recordCall('agent', COPILOT_MODEL, Date.now() - startedAt);
-  }
+  const { stdout } = await execFileAsync('copilot', args, {
+    cwd,
+    maxBuffer: 1024 * 1024 * 64,
+    timeout: timeoutMs,
+    env: process.env,
+  });
+  return stdout.trim();
 }
 
 /**
@@ -128,16 +76,11 @@ export async function runCopilotAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 10
   ];
   if (model) args.push('--model', model);
 
-  const startedAt = Date.now();
-  try {
-    const { stdout } = await execFileAsync('copilot', args, {
-      cwd,
-      maxBuffer: 1024 * 1024 * 64,
-      timeout: timeoutMs,
-      env: process.env,
-    });
-    return stdout.trim();
-  } finally {
-    recordCall('analysis', model, Date.now() - startedAt);
-  }
+  const { stdout } = await execFileAsync('copilot', args, {
+    cwd,
+    maxBuffer: 1024 * 1024 * 64,
+    timeout: timeoutMs,
+    env: process.env,
+  });
+  return stdout.trim();
 }
