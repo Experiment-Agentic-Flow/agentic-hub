@@ -17,14 +17,15 @@ export async function retrieveRelatedContext(description, repo, topK = 5) {
 
 /**
  * Finds the "appropriate" candidate repos for a ticket that doesn't specify one directly, purely
- * from vector-DB similarity - no LLM guessing from metadata alone. The candidate count is
- * adaptive, not a fixed number: the top match is always included, and subsequent matches are only
- * kept if they're close enough in score to be genuinely competitive. Candidates dedupe to one
- * entry *per repo*, but a monorepo can have several genuinely relevant Nx projects for a single
- * ticket - every competitive match for the same repo contributes its own `projectPath` into that
- * repo's `paths` list, rather than only the single best-scoring project surviving. The actual
- * choice of *which* candidate/path to modify is deferred to the coding agent, which can inspect
- * the real checked-out code rather than just text summaries.
+ * from vector-DB similarity - no LLM guessing from metadata alone. RAG's job stops at "which
+ * repo(s)": once a repo is a candidate, the coding agent gets the whole checkout and figures out
+ * which files to touch itself from the ticket description, the same way it already does when
+ * several repos are candidates side by side - there's no attempt here to also narrow down to
+ * individual libs/paths within a repo. The candidate count is adaptive, not a fixed number: the
+ * top match is always included, and subsequent matches are only kept if they clear an absolute
+ * floor OR are close enough to the top score to be genuinely competitive - checked as alternatives,
+ * not both required, since whenever the top match itself is a middling score, every other match is
+ * guaranteed to score even lower and could never pass an absolute-floor requirement otherwise.
  */
 export async function resolveCandidatesFromVectorSearch(
   description,
@@ -41,39 +42,22 @@ export async function resolveCandidatesFromVectorSearch(
   }
 
   const topScore = matches[0].score;
-  const byRepo = new Map();
+  const seenRepos = new Set();
+  const candidates = [];
 
   for (const match of matches) {
     const repo = match.metadata?.repo;
-    if (!repo) continue;
-    // A match is competitive if it clears the absolute floor OR is close enough to the top score -
-    // these must be checked as alternatives, not both required: whenever the top match itself is a
-    // middling score (below minScore), every other match is guaranteed to score even lower, so
-    // requiring the absolute floor on top of the relative check would make it impossible for any
-    // additional candidate to ever qualify.
+    if (!repo || seenRepos.has(repo)) continue;
     if (match.score < minScore && match.score < topScore - relativeMargin) continue;
 
-    if (!byRepo.has(repo)) {
-      if (byRepo.size >= maxCandidates) continue; // caps distinct repos, not paths within one repo
-      byRepo.set(repo, { repo, score: match.score, paths: [] });
-    }
-    const projectPath = match.metadata?.projectPath;
-    const candidate = byRepo.get(repo);
-    if (projectPath && !candidate.paths.includes(projectPath)) {
-      candidate.paths.push(projectPath);
-    }
+    seenRepos.add(repo);
+    candidates.push(match);
+    if (candidates.length >= maxCandidates) break;
   }
-
-  const candidates = [...byRepo.values()];
 
   // Always surface at least the single best match, even if it's below the usual thresholds.
   if (candidates.length === 0) {
-    const best = matches[0];
-    candidates.push({
-      repo: best.metadata?.repo,
-      score: best.score,
-      paths: best.metadata?.projectPath ? [best.metadata.projectPath] : [],
-    });
+    candidates.push(matches[0]);
   }
 
   return candidates;
