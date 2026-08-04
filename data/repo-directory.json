@@ -6,12 +6,45 @@
   },
   "Experiment-Agentic-Flow/quantitytakeoffservice": {
     "type": "api_service",
-    "purpose": "unknown - populated automatically on first RAG ingestion push",
+    "purpose": "Authenticated ASP.NET Core API for managing 3D-model and manual quantity-takeoff data associated with estimates/jobs, including model versions, property-set definitions, takeoff items, merged properties, changesets, asynchronous deletion and save workflows, and real-time client notifications.",
     "techStack": [
-      "dotnet"
+      ".NET 10 / ASP.NET Core",
+      "MongoDB",
+      "MassTransit",
+      "Azure Service Bus",
+      "Azure SignalR",
+      "Trimble File Service",
+      "TrimBim",
+      "AutoMapper",
+      "FluentValidation",
+      "Serilog",
+      "New Relic",
+      "Swagger and ReDoc",
+      "Azure App Configuration",
+      "Azure Key Vault"
     ],
-    "keyModules": [],
-    "notablePatterns": []
+    "keyModules": [
+      "Controllers/v1: versioned authenticated HTTP endpoints",
+      "Processor: business orchestration and request/domain mapping",
+      "Repositories: MongoDB persistence for models, takeoff items, manual takeoffs, changesets, merged properties, and customer storage details",
+      "Models: domain, request, response, view, configuration, enum, and validation types",
+      "MassTransitConsumers: asynchronous model-processing, deletion, save, and customer-data message handlers",
+      "CourierActivities: routing-slip activities for transactional save and deletion workflows",
+      "Services: Trimble file access, encryption, data protection, MongoDB transactions, indexes, and message data storage",
+      "SignalR/QuantityTakeoffHub: grouped real-time success and failure notifications",
+      "Extensions/ServiceCustomExtensions: dependency injection, authentication, messaging, SignalR, serialization, and infrastructure setup"
+    ],
+    "notablePatterns": [
+      "Controllers delegate to processors, processors orchestrate repositories and services, and repositories encapsulate MongoDB access.",
+      "Customer identity is obtained from authenticated HTTP claims and used in tenant-scoped queries.",
+      "Model and takeoff deletion uses soft-delete metadata, MongoDB sessions, and transaction helpers with compensation support.",
+      "MassTransit Azure Service Bus routing slips handle long-running save and deletion workflows.",
+      "Consumers publish success or failure notifications through a unified SignalR hub using client-provided group IDs.",
+      "Takeoff publishing replaces existing takeoff records for a job before inserting the submitted batch.",
+      "API versioning, customer/license authorization policies, FluentValidation integration, CORS, rate limiting, health checks, Swagger, and ReDoc are configured in the application pipeline.",
+      "JSON uses case-insensitive property matching, original property names, and string enum serialization."
+    ],
+    "updatedAt": "2026-08-04T13:57:31.582Z"
   },
   "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
     "type": "api_service",
@@ -21,5 +54,11 @@
     ],
     "keyModules": [],
     "notablePatterns": []
+  },
+  "_ingestionState": {
+    "Experiment-Agentic-Flow/quantitytakeoffservice": {
+      "lastSha": "4993c84e0e09c83f9ddac358bbcec2b6287e00f2",
+      "updatedAt": "2026-08-04T13:57:31.583Z"
+    }
   }
 }
