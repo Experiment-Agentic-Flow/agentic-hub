@@ -18,13 +18,13 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
                                                     +-----------------+-----------------+
                                                     |                                   |
                                        .github/workflows/unified-agent-runner.yml   .github/workflows/rag-ingestion-dispatch.yml
-                                        (bugfix-agent.js / tech-debt-agent.js)     (repository_dispatch from a target
+                                        (bugfix-agent.js / general-agent.js)     (repository_dispatch from a target
                                                                                     repo's own trigger-only workflow)
 ```
 
 - **Router** — Jira + n8n. Jira fires a webhook to n8n on ticket creation. n8n forwards just the ticket key and type via a
   `repository_dispatch` to this repo - agent-hub itself fetches the ticket description from Jira, resolves the target
-  repo(s) (via the parent ticket for bugfix, or a vector-DB search for tech-debt), and decides what to change.
+  repo(s) (via the parent ticket for bugfix, or a vector-DB search otherwise), and decides what to change.
 - **Memory** — Pinecone (serverless vector DB), kept fresh incrementally: each target repo's own
   push re-analyzes only what actually changed since the last successful run.
 - **Brain & Hands** — this repo: ingestion scripts, agent logic, and the GitHub Actions
@@ -38,7 +38,7 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 | [.github/workflows/unified-agent-runner.yml](.github/workflows/unified-agent-runner.yml) | Entry point triggered by n8n via `repository_dispatch`. |
 | [.github/workflows/rag-ingestion-dispatch.yml](.github/workflows/rag-ingestion-dispatch.yml) | Entry point triggered by a target repo's own trigger-only workflow via `repository_dispatch`; does the actual clone + ingestion. |
 | [rag-ingestion/](rag-ingestion/ingestOnPush.js) | Per-push incremental ingestion entrypoint (`ingestOnPush.js`) and the summarize/embed logic it calls into. |
-| [agent-logic/](agent-logic/copilotAgent.js) | The LLM code-editing agents: [bugfix-agent.js](agent-logic/bugfix-agent.js) and [tech-debt-agent.js](agent-logic/tech-debt-agent.js). |
+| [agent-logic/](agent-logic/copilotAgent.js) | The LLM code-editing agents: [bugfix-agent.js](agent-logic/bugfix-agent.js) and [general-agent.js](agent-logic/general-agent.js). |
 | [shared/](shared/config.js) | Shared Pinecone / Copilot CLI clients and config used by both layers. |
 
 ## The incremental RAG ingestion flow
@@ -101,14 +101,14 @@ to run first.
    - **Fetch and classify the ticket** — [agent-logic/fetchTicket.js](agent-logic/fetchTicket.js) fetches the ticket's
      summary/description/issue type from Jira, then [agent-logic/jira.js](agent-logic/jira.js)'s `classifyTicketType()`
      maps the Jira issue type to an automation category: **"User Story Bug"** (a subtask type) → bugfix,
-     **"Technical Debt"** → tech-debt, anything else (`Story`/`User Story` parent containers, `Task`, `Epic`, ...) → not
-     automated, and the job cleanly no-ops rather than guessing.
+     anything else (`Technical Debt`, `Story`/`User Story` parent containers, `Task`, `Epic`, ...) → general ticket,
+     and only a missing issue type causes the job to cleanly no-op rather than guessing.
    - **Gather candidate repos** — [agent-logic/repoCandidates.js](agent-logic/repoCandidates.js) gathers candidate repo(s)
-     for [agent-logic/bugfix-agent.js](agent-logic/bugfix-agent.js) / [agent-logic/tech-debt-agent.js](agent-logic/tech-debt-agent.js)
+     for [agent-logic/bugfix-agent.js](agent-logic/bugfix-agent.js) / [agent-logic/general-agent.js](agent-logic/general-agent.js)
      to consider, in priority order: bugfix tickets look up **every** repo
      referenced by the Jira parent ticket's linked PRs *and* branches ([agent-logic/jira.js](agent-logic/jira.js)) - a
-     parent story/epic can span several repos, so all of them become candidates; otherwise (tech-debt always, since it
-     has no parent ticket) an adaptive set of "appropriate" candidates comes from a vector-DB search
+     parent story/epic can span several repos, so all of them become candidates; otherwise (general tickets always, since
+     they have no parent ticket) an adaptive set of "appropriate" candidates comes from a vector-DB search
      ([agent-logic/contextRetrieval.js](agent-logic/contextRetrieval.js)) - one match if there's a clear winner, several if
      more than one repo is a genuinely competitive match. Every vector-search-derived candidate uses its actual
      GitHub default branch ([agent-logic/githubPr.js](agent-logic/githubPr.js)'s `getDefaultBranch`) rather than
@@ -158,5 +158,5 @@ to run first.
 ```bash
 npm run ingest:push      # incremental ingestion for one already-checked-out repo (requires REPO, REPO_TYPE, REPO_DIR env vars)
 npm run agent:bugfix     # run the bugfix agent (requires TICKET_KEY, TICKET_DESCRIPTION; TARGET_BRANCH/WORKSPACE_DIR optional)
-npm run agent:tech-debt  # run the tech-debt agent (repo/path are always resolved via RAG - see the ticket lifecycle above)
+npm run agent:general  # run the general-ticket agent (repo/path are always resolved via RAG - see the ticket lifecycle above)
 ```

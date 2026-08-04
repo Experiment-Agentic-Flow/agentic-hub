@@ -27,7 +27,7 @@ jobs:
       - name: Install GitHub Copilot CLI
         run: npm install -g @github/copilot
 
-      # n8n only ever sends the ticket key - the ticket type (bugfix/tech-debt/not automated) is
+      # n8n only ever sends the ticket key - the ticket type (bugfix/general/not automated) is
       # classified entirely within agent-hub, from the Jira issue type. This step fetches the
       # ticket's summary/description and resolves its type for later steps to use.
       - name: Fetch ticket details
@@ -41,11 +41,11 @@ jobs:
           JIRA_API_VERSION: ${{ vars.JIRA_API_VERSION }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
 
-      # No checkout step here either: bugfix-agent.js / tech-debt-agent.js gather candidate
+      # No checkout step here either: bugfix-agent.js / general-agent.js gather candidate
       # repo(s) themselves entirely within GitHub Actions - via the Jira parent ticket for bugfix,
-      # or a vector-DB search for tech-debt - clone each candidate into WORKSPACE_DIR, and (if more
-      # than one came back) let the coding agent inspect the real checked-out code to decide which
-      # one to actually modify.
+      # or a vector-DB search for anything else (Technical Debt, Story, Task, ...) - clone each
+      # candidate into WORKSPACE_DIR, and (if more than one came back) let the coding agent inspect
+      # the real checked-out code to decide which one to actually modify.
       - name: Run bugfix agent
         if: steps.fetch-ticket.outputs.ticket_type == 'bugfix-ticket'
         working-directory: agent-hub
@@ -65,10 +65,10 @@ jobs:
           TICKET_DESCRIPTION: ${{ steps.fetch-ticket.outputs.description }}
           WORKSPACE_DIR: ${{ github.workspace }}/workspace
 
-      - name: Run tech-debt agent
-        if: steps.fetch-ticket.outputs.ticket_type == 'tech-debt-ticket'
+      - name: Run agent (non-bugfix tickets)
+        if: steps.fetch-ticket.outputs.ticket_type == 'general-ticket'
         working-directory: agent-hub
-        run: node agent-logic/tech-debt-agent.js
+        run: node agent-logic/general-agent.js
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ vars.COPILOT_MODEL }}

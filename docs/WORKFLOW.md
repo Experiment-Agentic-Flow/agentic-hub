@@ -1,7 +1,7 @@
 # agent-hub: Ticket-to-PR Workflow
 
 This document walks through the entire journey from a Jira ticket being created to a pull request
-landing in the target repository, covering both agentic workflows (bugfix and tech-debt), how a
+landing in the target repository, covering both agentic workflows (bugfix and general ticket implementation), how a
 ticket is classified and routed to the right repo(s), how code changes are made and PR'd, and — in
 detail — the Retrieval-Augmented Generation (RAG) layer that supports repo/context resolution. For
 a higher-level architecture summary, see [README.md](README.md).
@@ -18,14 +18,14 @@ n8n forwards only { ticket_key } via repository_dispatch
 agent-logic/fetchTicket.js fetches summary/description/issue type from Jira
         │
         ▼
-classifyTicketType(): "User Story Bug" → bugfix   |   "Technical Debt" → tech-debt   |   else → no-op
+classifyTicketType(): "User Story Bug" → bugfix   |   anything else → general ticket   |   missing issue type → no-op
         │
         ▼
 agent-logic/repoCandidates.js gatherCandidates()
         │
         ├─ bugfix ticket, parent's linked PR/branch found? ──────► use that repo (no RAG — see below)
         │
-        └─ otherwise (tech-debt always; bugfix with no parent match)
+        └─ otherwise (general ticket always; bugfix with no parent match)
                     │
                     ▼
            RAG: resolveCandidatesFromVectorSearch(description)
@@ -34,7 +34,7 @@ agent-logic/repoCandidates.js gatherCandidates()
         clone candidate repo(s) → coding agent inspects real code → applies fix/refactor
                     │
                     ▼
-        (tech-debt, single-candidate only) RAG: retrieveRelatedContext() adds extra context
+        (general ticket, single-candidate only) RAG: retrieveRelatedContext() adds extra context
                     │
                     ▼
         git diff detected per candidate → commit, push, open PR for every repo actually changed
@@ -48,8 +48,8 @@ agent-logic/repoCandidates.js gatherCandidates()
 [agent-logic/fetchTicket.js](agent-logic/fetchTicket.js) fetches the ticket's summary, description,
 and Jira issue type, then [agent-logic/jira.js](agent-logic/jira.js)'s `classifyTicketType()` maps
 the issue type to an automation category: **"User Story Bug"** (a subtask type) → bugfix,
-**"Technical Debt"** → tech-debt, anything else (`Story`/`User Story` parent containers, `Task`,
-`Epic`, ...) → not automated, and the job cleanly no-ops rather than guessing.
+anything else (`Technical Debt`, `Story`/`User Story` parent containers, `Task`, `Epic`, ...) → general
+ticket, and only a missing issue type causes the job to cleanly no-op rather than guessing.
 
 [agent-logic/repoCandidates.js](agent-logic/repoCandidates.js)'s `gatherCandidates()` then resolves
 which repo(s) the ticket targets, in priority order:
@@ -58,7 +58,7 @@ which repo(s) the ticket targets, in priority order:
    *and* branches (via Jira's Development panel / dev-status API,
    [agent-logic/jira.js](agent-logic/jira.js)'s `resolveTargetReposFromParent`) — a parent
    story/epic can span several repos, so all of them become candidates.
-2. **Otherwise** (tech-debt always; bugfix only when step 1 found nothing): an adaptive set of
+2. **Otherwise** (general ticket always; bugfix only when step 1 found nothing): an adaptive set of
    candidates from a RAG vector-DB search — see [RAG in this workflow](#rag-in-this-workflow) below.
 
 ### Bugfix tickets resolved via a parent ticket do not use RAG at all
@@ -67,7 +67,7 @@ This is intentional, and worth calling out explicitly since it's easy to assume 
 the loop. If step 1 above finds any repos, those are used directly —
 `resolveCandidatesFromVectorSearch` (RAG) is never called for this ticket. Separately,
 [agent-logic/bugfix-agent.js](agent-logic/bugfix-agent.js) never calls `retrieveRelatedContext()`
-either (that's only wired into [agent-logic/tech-debt-agent.js](agent-logic/tech-debt-agent.js)).
+either (that's only wired into [agent-logic/general-agent.js](agent-logic/general-agent.js)).
 So for a typical bugfix subtask whose parent story already has a linked branch/PR, **RAG plays no
 role whatsoever** — not for finding the repo, and not for extra context.
 
@@ -81,7 +81,7 @@ worse — slower, and with a (small but nonzero) chance of picking the wrong rep
 |---|---|---|
 | Bugfix, parent ticket has linked PR(s)/branch(es) | Jira dev-status API | **No** |
 | Bugfix, parent ticket has no linked activity yet | Vector search | Yes (candidate resolution only) |
-| Tech-debt (always — no parent ticket concept) | Vector search | Yes (candidate resolution **and** related-context) |
+| General ticket (always — no parent ticket concept) | Vector search | Yes (candidate resolution **and** related-context) |
 
 ## Cloning, coding, and PR creation
 
@@ -126,7 +126,7 @@ in advance.
 Both consumers live in [agent-logic/contextRetrieval.js](agent-logic/contextRetrieval.js):
 
 1. **Candidate repo resolution** — `resolveCandidatesFromVectorSearch(description)`, called from
-   `gatherCandidates()` (used by tech-debt always, and bugfix only as a fallback — see the table
+   `gatherCandidates()` (used by general tickets always, and bugfix only as a fallback — see the table
    above). Embeds the ticket description as a `'query'` vector, searches the index, and returns an
    *adaptive* set of candidates: the top match is always included; further matches are only added
    if they're close enough in score to be genuinely competitive (`minScore: 0.65`,
@@ -139,7 +139,7 @@ Both consumers live in [agent-logic/contextRetrieval.js](agent-logic/contextRetr
    span several libs in the same monorepo - the coding agent only gets hard-scoped to a single
    directory when exactly one project matched.
 2. **Related architectural context** — `retrieveRelatedContext(description, repo)`, called from
-   [agent-logic/tech-debt-agent.js](agent-logic/tech-debt-agent.js) only (single-candidate case):
+   [agent-logic/general-agent.js](agent-logic/general-agent.js) only (single-candidate case):
    once the target repo is known, this re-queries the index filtered to that repo and feeds the
    top matches' metadata into the coding agent's prompt as extra grounding context before it starts
    editing.
@@ -247,9 +247,9 @@ with or show a user — not just a bare repo name and similarity score.
 | Purpose | Model | Where configured |
 |---|---|---|
 | Embeddings (both ingestion and query time) | `llama-text-embed-v2` (Pinecone-hosted inference), 1024-dim, cosine similarity | [shared/config.js](shared/config.js) `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION`, overridable via `PINECONE_EMBEDDING_MODEL` env var |
-| Ingestion's read-only exploration/summarization agent | Same model as the coding agents by default (`COPILOT_MODEL`, `claude-sonnet-5`) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAnalysis`, overridable per-call |
-| Coding agents (bugfix/tech-debt implementation) | `COPILOT_MODEL` (`claude-sonnet-5` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
-| (Unused elsewhere) cheap/fast fallback model | `COPILOT_SUMMARY_MODEL` (`claude-haiku-4.5` default) | Available via `runCopilotPrompt` for any future no-tool text-generation use |
+| Ingestion's read-only exploration/summarization agent | Same model as the coding agents by default (`COPILOT_MODEL`, `gpt-4o`) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAnalysis`, overridable per-call |
+| Coding agents (bugfix/general ticket implementation) | `COPILOT_MODEL` (`gpt-4o` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
+| (Unused elsewhere) cheap/fast fallback model | `COPILOT_SUMMARY_MODEL` (`gpt-4o` default) | Available via `runCopilotPrompt` for any future no-tool text-generation use |
 
 **Why `llama-text-embed-v2` and not a code-specialized embedding model:** everything actually
 embedded — both the ingested summaries and the ticket descriptions used to query them — is

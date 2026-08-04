@@ -6,10 +6,10 @@ import { fetchTicketDetails, classifyTicketType } from './jira.js';
 /**
  * n8n only forwards the ticket key via repository_dispatch - not the description or ticket type -
  * so this step fetches the ticket's summary/description/issue type directly from Jira, classifies
- * it (bugfix-ticket / tech-debt-ticket / not automated), and exposes the results as $GITHUB_OUTPUT
- * for later workflow steps. Tickets that don't classify (e.g. "Story", "Task", "Epic") get an
- * empty `ticket_type` output, which causes both agent steps' `if:` conditions to skip - a clean
- * no-op rather than a failure.
+ * it (bugfix-ticket / general-ticket / not automated), and exposes the results as $GITHUB_OUTPUT
+ * for later workflow steps. Only tickets Jira couldn't return an issue type for at all get an empty
+ * `ticket_type` output, which causes both agent steps' `if:` conditions to skip - a clean no-op
+ * rather than a failure.
  */
 async function main() {
   const { TICKET_KEY, GITHUB_OUTPUT } = process.env;
@@ -21,9 +21,7 @@ async function main() {
   const ticketType = classifyTicketType(issueType);
 
   if (!ticketType) {
-    console.log(
-      `Ignoring ${TICKET_KEY}: issue type "${issueType}" is not automated (only "User Story Bug" and "Technical Debt" trigger agent-hub).`
-    );
+    console.log(`Ignoring ${TICKET_KEY}: could not resolve an issue type from Jira.`);
   }
 
   const combined = summary && description && description !== summary ? `${summary}\n\n${description}` : description || summary;

@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
 import { ensureIndexExists, upsertRecords, deleteRecords, pruneStale } from '../shared/pinecone.js';
-import { getIngestionState, setIngestionState } from './ingestionState.js';
 import { ingestApiServiceFromDir } from './apiServiceIngestor.js';
 import {
   ingestMonorepoFull,
@@ -10,6 +9,7 @@ import {
   resolveDeletedProjectIds,
 } from './monorepoIngestor.js';
 import { diffBetween, currentHeadSha } from './gitDiff.js';
+import { upsertRepoDirectoryFromRecords, getLocalIngestionState, setLocalIngestionState } from '../shared/repoDirectory.js';
 
 const ZERO_SHA = '0'.repeat(40);
 
@@ -44,7 +44,7 @@ async function main() {
 
   await ensureIndexExists();
 
-  const state = await getIngestionState(repo);
+  const state = getLocalIngestionState(repo);
   // A real push event's own before/after range is authoritative. A manual workflow_dispatch has
   // no "before" of its own, so it falls back to whatever was last successfully ingested - this is
   // also what lets a re-run catch up on any push whose own workflow run failed.
@@ -65,14 +65,16 @@ async function main() {
     } else {
       const records = await ingestApiServiceFromDir({ repo, repoDir }, runId);
       await upsertRecords(records);
-      console.log(`  upserted ${records.length} record(s)`);
+      upsertRepoDirectoryFromRecords(repo, records);
+      console.log(`  summarized and wrote ${records.length} record(s) to repo-directory.json`);
     }
   } else if (repoType === 'monorepo') {
     if (!diff) {
       console.log('  no prior ingestion state (or diff unavailable) - running full baseline ingest');
       const records = await ingestMonorepoFull({ repo, repoDir }, runId);
       const pruned = await pruneStale(repo, runId);
-      console.log(`  analyzed + upserted ${records.length} record(s), pruned ${pruned} stale record(s)`);
+      upsertRepoDirectoryFromRecords(repo, records, { fullReplace: true });
+      console.log(`  analyzed ${records.length} project(s), wrote them to repo-directory.json (pruned ${pruned} stale Pinecone record(s))`);
     } else if (diff.changedFiles.length === 0) {
       console.log('  no file changes detected - skipping');
     } else {
@@ -89,8 +91,9 @@ async function main() {
       } else {
         const records = await ingestMonorepoProjects({ repo, repoDir, projectNames: [...affected] }, runId);
         if (deletedIds.length) await deleteRecords(deletedIds);
+        upsertRepoDirectoryFromRecords(repo, records, { deletedIds });
         console.log(
-          `  re-analyzed + upserted ${records.length} affected project(s): ${[...affected].join(', ') || 'none'}; ` +
+          `  re-analyzed ${records.length} affected project(s), updated repo-directory.json: ${[...affected].join(', ') || 'none'}; ` +
             `removed ${deletedIds.length} deleted project(s)`
         );
       }
@@ -99,7 +102,7 @@ async function main() {
     throw new Error(`Unknown REPO_TYPE "${repoType}" (expected "api_service" or "monorepo")`);
   }
 
-  await setIngestionState(repo, afterSha);
+  setLocalIngestionState(repo, afterSha);
   console.log('Done.');
 }
 

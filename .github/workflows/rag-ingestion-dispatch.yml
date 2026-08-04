@@ -11,6 +11,8 @@ on:
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout agentic-hub
         uses: actions/checkout@v4
@@ -55,3 +57,18 @@ jobs:
           PINECONE_INDEX: ${{ vars.PINECONE_INDEX }}
           PINECONE_EMBEDDING_MODEL: ${{ vars.PINECONE_EMBEDDING_MODEL }}
           RAG_INGEST_CONCURRENCY: ${{ vars.RAG_INGEST_CONCURRENCY }}
+
+      # data/repo-directory.json is a plain-JSON mirror of the same summaries just written to
+      # Pinecone above (see shared/repoDirectory.js) - committed straight back to this repo so
+      # agent-logic/repoDirectoryLookup.js always reads the latest version on the next ticket.
+      - name: Commit updated repo directory
+        run: |
+          git config user.name "agent-hub-bot"
+          git config user.email "agent-hub-bot@users.noreply.github.com"
+          if git diff --quiet -- data/repo-directory.json; then
+            echo "No repo-directory.json changes to commit."
+          else
+            git add data/repo-directory.json
+            git commit -m "chore: update repo-directory.json (${{ github.event.client_payload.repo }})"
+            git push
+          fi

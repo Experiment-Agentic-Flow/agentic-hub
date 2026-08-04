@@ -1,6 +1,11 @@
 import { getPineconeClient } from './embeddings.js';
 import { PINECONE_INDEX, EMBEDDING_DIMENSION } from './config.js';
 
+// Writes to Pinecone are switched off by default - ingestion now runs entirely against
+// data/repo-directory.json (see shared/repoDirectory.js) instead. Set RAG_PINECONE_ENABLED=true
+// to resume writing vectors without touching any other ingestion code.
+const PINECONE_WRITES_ENABLED = process.env.RAG_PINECONE_ENABLED === 'true';
+
 export async function getIndex() {
   const client = getPineconeClient();
   return client.index(PINECONE_INDEX);
@@ -8,6 +13,7 @@ export async function getIndex() {
 
 /** Creates the serverless index if it doesn't already exist. Safe to call every run. */
 export async function ensureIndexExists() {
+  if (!PINECONE_WRITES_ENABLED) return;
   const client = getPineconeClient();
   const existing = await client.listIndexes();
   const found = existing.indexes?.some((i) => i.name === PINECONE_INDEX);
@@ -23,7 +29,7 @@ export async function ensureIndexExists() {
 }
 
 export async function upsertRecords(records, namespace = 'default') {
-  if (records.length === 0) return;
+  if (!PINECONE_WRITES_ENABLED || records.length === 0) return;
   const index = await getIndex();
   const BATCH_SIZE = 100;
   for (let i = 0; i < records.length; i += BATCH_SIZE) {
@@ -34,7 +40,7 @@ export async function upsertRecords(records, namespace = 'default') {
 
 /** Deletes specific vector ids outright - used by incremental ingestion to drop removed/renamed projects. */
 export async function deleteRecords(ids, namespace = 'default') {
-  if (!ids || ids.length === 0) return;
+  if (!PINECONE_WRITES_ENABLED || !ids || ids.length === 0) return;
   const index = await getIndex();
   await index.namespace(namespace).deleteMany(ids);
 }
@@ -48,6 +54,7 @@ export async function deleteRecords(ids, namespace = 'default') {
  * it's a bookkeeping vector, not ingested content.
  */
 export async function pruneStale(repo, currentRunId, namespace = 'default') {
+  if (!PINECONE_WRITES_ENABLED) return 0;
   const index = await getIndex();
   // Pinecone rejects an all-zero query vector ("must contain at least one non-zero value") - the
   // actual value doesn't affect which vectors match the `filter` below, only their ranking.

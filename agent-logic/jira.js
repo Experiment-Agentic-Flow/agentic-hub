@@ -73,15 +73,16 @@ export async function fetchTicketDetails(ticketKey) {
 
 /**
  * Maps a Jira issue type name to the automation it should trigger, or null if this ticket isn't
- * automated at all. Deliberately narrow: "User Story Bug" (a subtask type) is the only bugfix
- * trigger, "Technical Debt" is the only tech-debt trigger. Everything else - including "Task"
- * (inconsistently reused for tech-debt work in practice, making it too ambiguous to classify
- * safely) and "Story"/"User Story" parent containers - is intentionally ignored.
+ * automated at all. "User Story Bug" (a subtask type) is the only bugfix trigger - it has a parent
+ * ticket whose linked PRs/branches pin down the exact repo. Every other non-empty issue type
+ * (Technical Debt, Story, Task, Epic, ...) routes through the same vector-DB-driven flow: the
+ * RAG index summarizes the codebase itself, independent of ticket type, so it's just as capable
+ * of identifying the right repo/paths for a new feature story as it is for a tech-debt cleanup.
  */
 export function classifyTicketType(issueType) {
+  if (!issueType) return null;
   if (issueType === 'User Story Bug') return 'bugfix-ticket';
-  if (issueType === 'Technical Debt') return 'tech-debt-ticket';
-  return null;
+  return 'general-ticket';
 }
 
 /**

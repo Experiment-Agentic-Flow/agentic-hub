@@ -1,0 +1,25 @@
+{
+  "Experiment-Agentic-Flow/mepworkspace": {
+    "type": "monorepo",
+    "purpose": "Angular/Nx monorepo for MEP (Mechanical, Electrical, Plumbing) solutions - dozens of apps (hcui, ecui, livecount, fabui, sxui, analytics-portal, admin-assist-portal, asset-iq-portal, ...) and shared libraries under libs/, organized by domain.",
+    "projects": []
+  },
+  "Experiment-Agentic-Flow/quantitytakeoffservice": {
+    "type": "api_service",
+    "purpose": "unknown - populated automatically on first RAG ingestion push",
+    "techStack": [
+      "dotnet"
+    ],
+    "keyModules": [],
+    "notablePatterns": []
+  },
+  "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
+    "type": "api_service",
+    "purpose": "unknown - populated automatically on first RAG ingestion push",
+    "techStack": [
+      "dotnet"
+    ],
+    "keyModules": [],
+    "notablePatterns": []
+  }
+}
