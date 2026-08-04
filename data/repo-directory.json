@@ -156,43 +156,38 @@
       {
         "name": "asset-iq-portal",
         "path": "apps/asset-iq-portal",
-        "purpose": "Angular Asset IQ Portal application shell providing authenticated navigation, login and authentication-transition flows, a home page, and placeholder routes for document parsing and catalog sharing.",
+        "purpose": "Angular application shell for the Asset IQ Portal, providing authenticated navigation to Home, Document Parsing, and Catalog Share features, plus Login and Transition flows.",
         "keyModules": [
           "AppModule",
           "AppComponent",
           "AppRoutingModule",
           "AppEndpointModule",
+          "AssetIQPortalRoutes",
           "AssetIqPortalStateService",
           "canActivateWithValidAuthentication",
-          "AssetIQPortalRoutes",
-          "AssetIqPortalLoginFeatureModule",
-          "LoginComponent",
-          "AssetIqPortalTransitionFeatureModule",
-          "TransitionComponent",
-          "AssetIqPortalHomeFeatureModule",
-          "HomeComponent",
-          "AssetIqPortalDocumentParsingFeatureModule",
-          "DocumentParsingPlaceholderComponent",
-          "AssetIqPortalCatalogShareFeatureModule",
-          "CatalogSharePlaceholderComponent",
-          "TranslocoHttpLoader",
+          "AppState",
           "Storage",
           "localStorageSyncReducer",
           "clearState",
           "UserCard",
-          "IEnvironment"
+          "TranslocoHttpLoader",
+          "normalizeBrowserLang",
+          "getTranslocoConfig",
+          "mepAuthenticateDataAccessConfig",
+          "IEnvironment",
+          "IEnvironmentTest"
         ],
         "notablePatterns": [
-          "Angular NgModule-based application with feature libraries and lazy-loaded routes.",
-          "Shared MEP authentication APIs and facade provide session state, login, token refresh, logout, and route protection.",
-          "Authentication transition supports OAuth authorization-code handling and an automation identity-provider query parameter.",
-          "NgRx root store uses router state plus localStorage rehydration and clears state on authentication token removal.",
-          "Transloco provides localized assets for en-US, en-GB, German, and French with regional-language normalization and en-US fallback.",
-          "Modus Web Components provide the navbar, side navigation, menu, avatar, card, tooltip, icon, and modal-facing UI.",
-          "Environment-specific build replacements configure authentication endpoints, OAuth values, region, deployment type, and profile URLs."
+          "Angular NgModule bootstrap with provideHttpClient, Transloco, NgRx Store, and NgRx Effects.",
+          "Lazy-loaded feature modules for login, transition, home, document parsing, and catalog sharing.",
+          "Authentication uses shared MEP authentication APIs, an authentication guard, JWT claim decoding, and logout redirects.",
+          "Root application layout uses Modus Web Components for the navbar, side navigation, avatar, card, menu, tooltip, and icons.",
+          "NgRx meta-reducers synchronize authentication and selected shared feature state with localStorage and clear state on token removal.",
+          "Transloco provides browser-language normalization, English fallback handling, and JSON translations from assets/i18n.",
+          "Environment-specific development, staging, and production configuration supplies authentication endpoints, OAuth URLs, region, product, and profile settings."
         ],
         "tags": [],
-        "updatedAt": "2026-08-04T14:07:32.550Z"
+        "updatedAt": "2026-08-04T15:17:09.395Z"
       },
       {
         "name": "building-materials",
@@ -2594,7 +2589,7 @@
       {
         "name": "electricaldomain-bulkedit-feature",
         "path": "libs/electricaldomain/bulkedit/feature",
-        "purpose": "Angular feature library providing electrical bulk-edit screens for cables, loads, distribution boards, and protective devices, with shared DevExtreme grid behavior, custom cell editors, filtering, validation, localization, and batch-apply integration.",
+        "purpose": "Angular feature library providing bulk-edit screens for electrical cables, loads, distribution boards, and protective devices, with shared grid editing, validation, filtering, custom editors, apply/update state handling, and Transloco internationalization.",
         "keyModules": [
           "ElectricaldomainBulkEditFeatureModule",
           "BulkEditComponent",
@@ -2604,38 +2599,34 @@
           "BulkEditDistributionBoardComponent",
           "BulkEditProtectiveDeviceComponent",
           "BulkEditSupplyComponent",
-          "BulkEditFilterHeaderBtnDirective",
           "CustomCpcEditorComponent",
           "CustomDesignAllowanceEditorComponent",
           "CustomEuroClassEditorComponent",
-          "getConnectionTypeColumn",
-          "getEarthFaultColumn",
-          "getCpcColumn",
-          "getDesignAllowanceColumn",
-          "getMaxCableSizeColumn",
-          "getLoadTypeColumn",
-          "getDesignCurrentColumn",
-          "getDiversityFactorColumn",
+          "BulkEditFilterHeaderBtnDirective",
+          "createLookupFilterExpression",
+          "createNumericFilterExpression",
+          "createCalculatedNumericFilterExpression",
+          "createLookupCustomStore",
+          "validateNumber",
           "mapExtraColumnsToGridOptions",
           "getTranslatedColumnCaption",
           "loader",
           "providerUiConfig"
         ],
         "notablePatterns": [
-          "Standalone Angular components use signal-based inputs, outputs, computed state, effects, and dependency injection.",
-          "BulkEditGridComponent wraps DevExtreme DataGrid and centralizes editing, selection, validation, loading, filtering, repainting, and event forwarding.",
-          "Domain screens use BulkEditFacade signals and BulkEditApplyService for loading, batch updates, batch application, and modified-row tracking.",
-          "Cable, load, distribution-board, and protective-device grids define domain-specific columns and multi-row edit propagation.",
-          "Custom CPC, design-allowance, and Euro-class editors use popup-based editing with local copies, validation, save/cancel behavior, and DevExtreme cell integration.",
-          "BulkEditFilterHeaderBtnDirective synchronizes explicit header-filter buttons with DevExtreme filter-row DOM changes outside Angular's zone.",
-          "Transloco loaders dynamically merge feature and common translations for available languages and provide client-specific UI configuration.",
-          "Helper functions encapsulate lookup and numeric filter expressions, editor setup, display-value resolution, validation, and domain column construction."
+          "Standalone Angular components use signals, computed values, inject(), input(), output(), viewChild(), and lifecycle hooks.",
+          "BulkEditGridComponent wraps DevExtreme DataGrid and centralizes editing, selection, validation, loading, filtering, header-filter normalization, and event forwarding.",
+          "Domain components integrate with BulkEditFacade, BulkEditApplyService, and BulkEditFilterProviderService for reactive data loading, batch updates, and apply operations.",
+          "Custom editors use popup-based editing for CPC, design allowance, and cable Euro Classification values.",
+          "Reusable helpers provide lookup and numeric filter expressions, lazy-loading DevExtreme CustomStore instances, number validation, lookup mapping, and domain-specific column definitions.",
+          "Transloco loaders merge bulk-edit and common translations for supported languages, with fallback language handling.",
+          "DevExtreme grid behavior is extended with a directive that adds and synchronizes explicit header-filter buttons."
         ],
         "tags": [
           "scope:electricaldomain",
           "type:feature"
         ],
-        "updatedAt": "2026-08-04T14:12:43.623Z"
+        "updatedAt": "2026-08-04T15:17:17.380Z"
       },
       {
         "name": "electricaldomain-bulkedit-model",
@@ -3377,37 +3368,37 @@
       {
         "name": "fabui-assemblies-data-access",
         "path": "libs/fabui/assemblies/data-access",
-        "purpose": "Provides data access and NgRx state management for FabUI assemblies, including assembly search, retrieval, creation defaults, CRUD operations, selection/editing modes, viewer settings, and pagination.",
+        "purpose": "Provides Angular data access for assembly search and CRUD operations through the Corsa API, plus NgRx state for assembly lists, selection, editing/creation modes, viewer settings, pagination, and mutation status.",
         "keyModules": [
+          "AssembliesDataAccessConfig",
           "AssembliesService",
-          "AssembliesFacade",
           "AssembliesEffects",
+          "AssembliesFacade",
           "AssembliesState",
           "assembliesReducer",
           "assembliesQuery",
           "provideAssembliesState",
-          "AssembliesDataAccessConfig",
-          "Assembly CRUD and viewer action creators"
+          "FabAssemblies actions"
         ],
         "notablePatterns": [
-          "Angular injectable services use HttpClient and dependency injection.",
-          "NgRx feature state is registered under the fabuiAssemblies feature key.",
-          "Effects translate service responses and errors into success or failure actions.",
-          "Assembly search requests are mapped to the Corsa API search schema with keyword fields, filters, pagination, and sorting.",
-          "Viewer settings are persisted through WebStorageService using local-storage keys.",
-          "The facade exposes observable selectors and dispatch methods for API operations, selection, modes, viewer state, and settings."
+          "Standalone Angular injectable services using inject()",
+          "HttpClient-based API access with request-shape mapping for keyword search, filters, pagination, and sorting",
+          "NgRx feature state registered under the fabuiAssemblies key",
+          "NgRx actions, reducer, effects, selectors, and facade pattern",
+          "API message context propagation for requests",
+          "Assembly viewer settings persisted through WebStorageService and local storage"
         ],
         "tags": [
           "scope:fabui-assemblies",
           "type:data-access",
           "domain:fabui"
         ],
-        "updatedAt": "2026-08-04T14:15:17.940Z"
+        "updatedAt": "2026-08-04T15:17:01.351Z"
       },
       {
         "name": "fabui-assemblies-feature",
         "path": "libs/fabui/assemblies/feature",
-        "purpose": "Provides the standalone assembly creation and editing form for FabUI, including assembly identity, status, work-package selection, selected-part summaries, material management, validation, and submit/cancel events.",
+        "purpose": "Provides the FABUI assembly creation and editing feature, including assembly naming, selected-part summaries, material management, work-package lookup, and create/edit submission events.",
         "keyModules": [
           "AssemblyCreationFormComponent",
           "IAssembly",
@@ -3419,21 +3410,21 @@
           "featureScopeFactory"
         ],
         "notablePatterns": [
-          "Angular standalone component with OnPush change detection",
+          "Standalone Angular component with OnPush change detection",
           "Angular signal inputs, outputs, computed state, and effects",
-          "Create/edit mode behavior with create requests and JSON Patch updates",
-          "Transloco scoped internationalization under the assemblies scope",
-          "RxJS debounced prefix-change output",
-          "Integration with WorkPackagesService and PickListFacade",
-          "Modus Web Components for form controls, collapses, badges, chips, and icons",
-          "Selection-derived material, weight, and bounding-size summaries"
+          "Transloco scoped translations under the assemblies scope",
+          "Debounced prefix-change output using RxJS",
+          "WorkPackagesService-backed autocomplete search",
+          "Selected-part bounds aggregation and weight/size summaries",
+          "Material detection, removal, and catalog-addition state management",
+          "Per-project rotating assembly color assignment"
         ],
         "tags": [
           "scope:fabui-assemblies",
           "type:feature",
           "domain:fabui"
         ],
-        "updatedAt": "2026-08-04T14:15:04.296Z"
+        "updatedAt": "2026-08-04T15:17:17.407Z"
       },
       {
         "name": "fabui-bill-of-materials-data-access",
@@ -5612,46 +5603,47 @@
       {
         "name": "livecount-models-feature",
         "path": "libs/livecount/models/feature",
-        "purpose": "Angular feature library for managing Livecount 3D models, including model and version selection, model grid display/editing, previous-version management, model upload/version workflows, item-type selection, loading resolution, and localized UI.",
+        "purpose": "Provides the LiveCount feature for managing 3D models and model versions, including loading, displaying, adding, updating, deleting, and selecting model data.",
         "keyModules": [
           "LivecountModelsFeatureModule",
+          "modelRoutes",
           "ModelsContainerComponent",
           "ModelGridComponent",
-          "ModelsResolver",
+          "ModelsPageComponent",
+          "ModelsPageCardComponent",
+          "ModelsPageToolbarComponent",
           "ManageModelsComponent",
           "ModelFileVersionSelectorComponent",
           "SelectModelItemTypesComponent",
           "PreviousVersionsComponent",
           "UpdateModelVersionDialogComponent",
-          "ModelGridConfig",
-          "ModelGridColumnDefinition",
-          "ModelActionsService",
           "ThumbnailCellTemplateComponent",
           "VersionIconCellTemplateComponent",
           "ShowHidePreviousVersionsCellTemplateComponent",
+          "ModelGridConfig",
+          "ModelGridColumnDefinition",
+          "ModelActionsService",
+          "ModelsResolver",
           "RowHoverInitDirective",
-          "modelRoutes",
           "featureScopeName",
           "featureTranslationImporter",
           "featureScopeFactory"
         ],
         "notablePatterns": [
-          "Uses an NgModule-based feature entry point with child routing and a mix of module-based and standalone components.",
-          "Uses ModelsFacade and ModelsService for model data operations, with RxJS streams, Angular signals, computed values, effects, and lifecycle cleanup.",
-          "Uses DevExtreme tree and grid controls for file/version selection and model management, including editable cells, multi-selection, infinite scrolling, templates, and persisted per-user grid state.",
-          "Supports model version behavior through the LC_3DQTO_ModelVersions feature flag.",
-          "Model file selection filters accepted 3D extensions, retrieves processing status, progressively merges asynchronous results, preserves file order, and caches folder tree results.",
-          "Uses Transloco feature-scoped, dynamically imported localization resources for en-GB, en-US, French, and Dutch.",
-          "Uses an Angular route resolver that dispatches model loading and waits for success or load-error actions.",
-          "Uses reactive forms and validation for editing previous model-version names and version text.",
-          "Uses ModelActionsService subjects to communicate add-version and update-version actions from grid cell templates to ModelGridComponent.",
-          "Uses a standalone directive with afterNextRender, closest ancestor lookup, Renderer2 listeners, and explicit listener cleanup for grid-row hover handling."
+          "Uses a hybrid Angular architecture with an NgModule feature shell and standalone components.",
+          "Uses ModelsFacade and RxJS streams for model data and operations, with Angular signals and computed values for local UI state.",
+          "Provides a DevExtreme-based configurable model grid with selection, inline editing, infinite scrolling, master-detail previous-version rows, custom cell templates, and localStorage state persistence.",
+          "Supports feature-flagged switching between the legacy grid and redesigned card-based models page.",
+          "Uses an Angular route resolver to load models and wait for success or load-error actions.",
+          "Uses Transloco scoped internationalization with en-GB, en-US, French, and Dutch translation assets.",
+          "Uses ModelActionsService subjects to communicate add-version and update-version actions from grid cell templates.",
+          "Integrates model management with LiveCount models data access, estimating APIs, shared dialogs, toasts, progress UI, and spinners."
         ],
         "tags": [
           "scope:livecount",
           "type:feature"
         ],
-        "updatedAt": "2026-08-04T14:20:13.553Z"
+        "updatedAt": "2026-08-04T15:17:35.361Z"
       },
       {
         "name": "livecount-models-model",
@@ -5785,15 +5777,18 @@
       {
         "name": "livecount-quantity-takeoff-data-access",
         "path": "libs/livecount/quantity-takeoff/data-access",
-        "purpose": "Angular/Nx data-access library for Livecount quantity takeoff workflows, providing NgRx state management, HTTP/API services, custom and merged property persistence, OPFS storage, and background Connect file processing.",
+        "purpose": "Angular/Nx data-access library for Livecount quantity takeoff workflows, including API integration, NgRx state management, custom and merged properties, manual takeoff changes, 3D model processing, and OPFS-backed background processing.",
         "keyModules": [
           "QuantityTakeoffDataAccessModule",
           "QuantityTakeoffManagerFacade",
-          "CustomPropertiesFacade",
-          "MergePropertiesFacade",
           "QuantityTakeoffManagerEffects",
+          "quantityTakeoffManagerReducer",
+          "CustomPropertiesFacade",
           "CustomPropertiesEffects",
+          "customPropertiesReducer",
+          "MergePropertiesFacade",
           "MergePropertiesEffects",
+          "mergePropertiesReducer",
           "QuantityTakeoffService",
           "QuantityTakeoffApiService",
           "QuantityTakeoffOPFSService",
@@ -5803,38 +5798,38 @@
           "PsetServiceClient",
           "ConnectFileProcessor",
           "data-processor.worker",
-          "quantityTakeoffManagerReducer",
-          "customPropertiesReducer",
-          "mergePropertiesReducer",
-          "ConnectFileItem",
-          "DataProcessorMessage",
-          "ChangeSetDetails",
-          "ManualTakeoffBatchModificationRequest"
+          "getCovertedPropertyValue",
+          "getUnitForPropertyType",
+          "resolveParentSourceFileId"
         ],
         "notablePatterns": [
-          "NgRx feature stores with actions, reducers, selectors, effects, and facades for quantity-takeoff-manager, custom-properties, and merge-properties state.",
-          "Angular dependency injection with root-provided HTTP services and an NgModule that registers feature reducers, effects, and API provider mappings.",
-          "REST calls use an injected quantity-takeoff base URI and RxJS Observables.",
-          "Origin Private File System storage supports legacy and versioned Connect file paths, estimate data, metadata, and raw stream persistence.",
-          "CPU-intensive Connect file grouping, unit conversion, property projection, downloading, and recomputation run through a typed Web Worker message protocol.",
-          "ConnectFileProcessor normalizes units, applies custom properties and change sets, and creates grouped parent-child takeoff items.",
-          "PsetServiceClient extends the Trimble Connect SDK and updates credentials from the authentication token stream.",
-          "Feature-flagged initialization enables OPFS and the data processor worker when LC_3dQuantityTakeoff is active.",
-          "Unit conversion, checksum comparison, Connect file path/data handling, and default field constants are exposed as reusable utilities."
+          "NgRx feature slices with reducers, actions, selectors, effects, and injectable facades",
+          "Angular injectable services using HttpClient and RxJS Observables for backend operations",
+          "Signal-based facade selectors combined with observable action-response streams",
+          "Trimble Connect PSet SDK integration with access-token credential updates",
+          "Origin-aware ConnectFileItem grouping, aggregation, parent-child construction, and change-set application",
+          "Metric/imperial unit conversion for length, area, and volume properties",
+          "Origin-based source-file resolution for drawings and 3D models",
+          "OPFS storage and Web Worker processing coordinated through typed request IDs and pending RxJS Subjects",
+          "Feature-flagged initialization of OPFS and the data processor worker",
+          "QuantityTakeoffApiService adapter exposing facade state and SignalR success/failure callbacks"
         ],
         "tags": [
           "scope:hcui",
           "scope:livecount",
           "type:data-access"
         ],
-        "updatedAt": "2026-08-04T14:20:35.904Z"
+        "updatedAt": "2026-08-04T15:17:40.432Z"
       },
       {
         "name": "livecount-quantity-takeoff-feature",
         "path": "libs/livecount/quantity-takeoff/feature",
-        "purpose": "Angular feature library for Livecount quantity takeoff workflows, including item and element grid management, 3D model property grouping, annotation-linked quantities, view state, and takeoff item dialogs.",
+        "purpose": "Angular feature library for Livecount quantity takeoff management, providing routed takeoff UI with master/detail DevExtreme grids, item and element editing, annotation-linked quantities, 3D model properties, custom and merged properties, model grouping configuration, and localized resources.",
         "keyModules": [
           "QuantityTakeoffFeatureModule",
+          "takeoffRoutes",
+          "QuantityTakeoffResolver",
+          "StateService",
           "TakeoffContainerComponent",
           "TakeoffManagerOverviewComponent",
           "TakeoffItemGridComponent",
@@ -5842,32 +5837,35 @@
           "DefineTakeoffItemsComponent",
           "MergeTakeoffItemsButtonComponent",
           "MergeTakeoffItemsDialogComponent",
-          "TakeoffItemGridConfig",
-          "TakeoffItemGridColumnDefinition",
-          "TakeoffItemDataSourceConfig",
-          "QuantityTakeoffGridsCoordinatorService",
-          "QuantityTakeoffGridsNewRowManagementService",
-          "StateService",
-          "QuantityTakeoffResolver",
           "CellValidationComponent",
           "CustomCellTemplateComponent",
-          "ItemTypeCellTemplateComponent"
+          "ItemTypeCellTemplateComponent",
+          "TakeoffItemGridConfig",
+          "TakeoffItemDataSourceConfig",
+          "TakeoffItemGridColumnDefinition",
+          "QuantityTakeoffGridsCoordinatorService",
+          "QuantityTakeoffGridsNewRowManagementService",
+          "QuantitiesUnitTypeMapping",
+          "AddTakeoffWorkflow",
+          "IMergedTakeoffItem"
         ],
         "notablePatterns": [
-          "Uses an Angular NgModule with mostly non-standalone components and a standalone merge-items button/dialog.",
-          "Uses DevExtreme data grids with master/detail item-element relationships, virtual scrolling, editing, selection, persisted grid state, and Excel export.",
-          "Coordinates grid workflows through RxJS subjects, facades, and the AddTakeoffWorkflow enum.",
-          "Uses Angular signals and computed state for selection, loading, popup visibility, and mergeable items.",
-          "Integrates quantity cells with graphical takeoff annotations for count, length, and area values.",
-          "Loads models, custom properties, and merge properties through a route resolver before initiating quantity takeoff data loading.",
-          "Provides Transloco feature-scoped translations with locale-specific JSON assets.",
-          "Uses feature flags to control the merge-takeoff-items functionality."
+          "NgModule-based feature library with a child route and mixed legacy-declared and standalone Angular components.",
+          "DevExtreme master/detail grids use configurable columns, custom data sources, virtual scrolling, grid state persistence, selection synchronization, and Excel export.",
+          "QuantityTakeoffGridsCoordinatorService coordinates AddItem/AddElement workflows and cross-grid selection and expansion through RxJS subjects.",
+          "QuantityTakeoffGridsNewRowManagementService handles new-row validation, annotation linking, pending annotation state, quantity updates, and commit/cancel workflows.",
+          "QuantityTakeoffResolver eagerly loads custom and merge properties, waits for models and property outcomes, then triggers quantity takeoff data loading.",
+          "Angular signals, computed values, effects, toSignal, and takeUntilDestroyed are used alongside RxJS observables.",
+          "Annotation-aware cells are made read-only or blocked from editing when annotated, with supported quantity property types mapped to count, length, or area annotation workflows.",
+          "Transloco feature scope quantityTakeoffFeature provides localized item types, origins, validation messages, and UI text.",
+          "Grid columns dynamically combine core takeoff fields with 3D model, custom, and merged property columns, including measurement-system unit suffixes.",
+          "OPFS-backed quantity takeoff data is exposed to DevExtreme through DataSource and CustomStore load, insert, and update operations."
         ],
         "tags": [
           "scope:livecount",
           "type:feature"
         ],
-        "updatedAt": "2026-08-04T14:20:43.847Z"
+        "updatedAt": "2026-08-04T15:17:39.289Z"
       },
       {
         "name": "livecount-quantity-takeoff-model",
@@ -11313,7 +11311,7 @@
       {
         "name": "hcui-takeoff-assemblies-data-access",
         "path": "libs/hcui/takeoff/assemblies/data-access",
-        "purpose": "Provides HCUI assembly takeoff data access, including HTTP operations, content-provider integration, NgRx state management, assembly editing, specialized-stage loading, pricing/labor calculation, and takeoff commit workflows.",
+        "purpose": "Angular/Nx data-access library for assembly takeoff workflows in HCUI, providing HTTP operations, content-provider integration, NgRx state management, specialized-stage loading, assembly editing, pricing/labor calculation, and takeoff commit/update orchestration.",
         "keyModules": [
           "HcuiTakeoffAssembliesDataAccessModule",
           "AssemblyTakeoffService",
@@ -11323,27 +11321,29 @@
           "AssemblyTakeoffEffects",
           "AssemblyTakeoffState",
           "assemblyTakeoffReducer",
-          "AssemblyTakeoffFacade",
           "AssemblyFacade",
           "AssemblyItemsFacade",
-          "assemblyTakeoffReducer",
-          "getAssemblyTakeoffState",
-          "AssemblyTakeoffAction",
-          "AssemblyAction"
+          "AssemblyTakeoffFacade",
+          "assembly-takeoff.selectors",
+          "assembly.actions",
+          "assembly-items.actions",
+          "shared/assembly-takeoff.actions",
+          "featureScopeFactory"
         ],
         "notablePatterns": [
-          "Angular NgModule registers the assemblyTakeoff NgRx feature state and effects, clears feature state through a meta-reducer, provides an API interface adapter, and configures a Transloco scope.",
-          "NgRx actions, reducer, selectors, and effects coordinate assembly selection, loading, specialized-stage content, item edits, pricing/labor calculation, creation, and updates.",
-          "Facades expose store actions and state through RxJS Observables and Angular Signals.",
-          "HTTP services use injected base-URI tokens and typed model contracts for assembly retrieval, updates, existence checks, seeded assemblies, list items, and price/labor calculation.",
-          "AssembliesContentProviderFactory selects content providers based on assembly and library contexts, while SpecializedStageService maps seeded assembly API results to domain models.",
-          "Assembly changes are tracked in reducer state for header updates, component additions, updates, and deletions."
+          "NgRx feature state under the assemblyTakeoff key with reducer, selectors, actions, effects, and facades.",
+          "Angular injectable services use HttpClient and injected URI tokens for assembly, estimate-line-item, and list-management APIs.",
+          "NgRx effects orchestrate content providers, specialized-stage lists, assembly loading/editing, designation takeoff, pricing/labor calculation, WBS updates, and commit flows.",
+          "AssemblyFacade exposes both NgRx Observables and Angular Signals, including loading state derived from Actions.",
+          "AssembliesContentProviderFactory selects Trimble, workbench, seeded-workbench, and item-library content providers.",
+          "Transloco feature scope is registered as assembliesTakeoffDataAccess with locale files under src/lib/i18n.",
+          "The module registers the reducer and effects with NgRx and clears takeoff feature state through a meta-reducer."
         ],
         "tags": [
           "scope:hcui",
           "type:data-access"
         ],
-        "updatedAt": "2026-08-04T14:33:41.487Z"
+        "updatedAt": "2026-08-04T15:17:33.876Z"
       },
       {
         "name": "hcui-takeoff-assemblies-feature",
@@ -11467,9 +11467,10 @@
       {
         "name": "hcui-takeoff-assemblies-util",
         "path": "libs/hcui/takeoff/assemblies/util",
-        "purpose": "Angular utility library for HCUI takeoff assemblies, providing assembly and estimate-line-item mapping, assembly quantity/type calculations, specialized-stage mapping, and immutable assembly change tracking.",
+        "purpose": "Provides reusable assembly calculation, mapping, and change-tracking utilities for the HCUI takeoff assemblies domain.",
         "keyModules": [
           "AssemblyMapperService",
+          "HcuiTakeoffAssembliesUtilModule",
           "calculateLengthBasedTotalQuantity",
           "calculateCountBasedTotalQuantity",
           "recalculateAssemblyType",
@@ -11478,23 +11479,20 @@
           "trackComponentAdded",
           "trackComponentUpdated",
           "trackComponentRemoved",
-          "trackHeaderUpdated",
-          "HcuiTakeoffAssembliesUtilModule"
+          "trackHeaderUpdated"
         ],
         "notablePatterns": [
-          "Standalone Nx Angular library tagged scope:hcui and type:util",
-          "AssemblyMapperService is provided in the root injector",
-          "Mapping methods convert content items, assembly definitions, assembly views, assembly items, specialized content, and estimate line items between domain models",
-          "New assembly item identifiers are generated with Guid.create().toString()",
-          "Change tracking uses immutable object and nested-record spreads",
-          "Calculation helpers distinguish length-based and count-based quantities and infer assembly types from item measure or calculation-base values",
-          "Co-located Jest unit tests cover calculation, mapping, and change-tracking utilities"
+          "AssemblyMapperService is an Angular root-provided injectable that converts among content items, assembly definitions, assembly views, assembly items, specialized stage items, and estimate line items.",
+          "Assembly mapping creates GUID-based identifiers for newly constructed assembly items and line items.",
+          "Calculation helpers use AssemblyType, CalculationBaseType, and ItemMeasureType enums, with length as the fallback assembly type.",
+          "Change tracking functions return immutable state updates for new, modified, deleted, and header assembly changes.",
+          "The Nx Angular utility library uses Jest unit tests with co-located specifications."
         ],
         "tags": [
           "scope:hcui",
           "type:util"
         ],
-        "updatedAt": "2026-08-04T14:33:55.467Z"
+        "updatedAt": "2026-08-04T15:17:07.223Z"
       },
       {
         "name": "hcui-takeoff-automatic-fittings-api",
@@ -18135,8 +18133,8 @@
       "updatedAt": "2026-08-04T14:01:33.646Z"
     },
     "Experiment-Agentic-Flow/mepworkspace": {
-      "lastSha": "6f080f4fce00dbc9941d74d0adef2dd29991e634",
-      "updatedAt": "2026-08-04T14:50:47.962Z"
+      "lastSha": "9a0e3c4ce9853cba422bee21960cae9f54228c5c",
+      "updatedAt": "2026-08-04T15:17:40.448Z"
     }
   }
 }
