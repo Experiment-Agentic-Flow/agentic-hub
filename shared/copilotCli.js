@@ -6,10 +6,10 @@ const execFileAsync = promisify(execFile);
 // GitHub Copilot CLI (`copilot`) must be installed and authenticated.
 // Auth precedence: COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN, using a token with the
 // "Copilot Requests" permission. See https://github.com/github/copilot-cli
-// Bugfix/general-ticket implementation agents default to gpt-4o; override via COPILOT_MODEL.
-export const COPILOT_MODEL = process.env.COPILOT_MODEL || 'gpt-4o';
+// Bugfix/general-ticket implementation agents default to gpt-5.6-luna; override via COPILOT_MODEL.
+export const COPILOT_MODEL = process.env.COPILOT_MODEL || 'gpt-5.6-luna';
 // Summarization is a cheap, low-reasoning task, so default it to a fast/low-cost model.
-export const COPILOT_SUMMARY_MODEL = process.env.COPILOT_SUMMARY_MODEL || 'gpt-4o';
+export const COPILOT_SUMMARY_MODEL = process.env.COPILOT_SUMMARY_MODEL || 'gpt-5.6-luna';
 
 /**
  * Runs `copilot` non-interactively as a pure text generator: shell and file-write tools are

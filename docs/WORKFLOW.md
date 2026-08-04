@@ -247,9 +247,9 @@ with or show a user — not just a bare repo name and similarity score.
 | Purpose | Model | Where configured |
 |---|---|---|
 | Embeddings (both ingestion and query time) | `llama-text-embed-v2` (Pinecone-hosted inference), 1024-dim, cosine similarity | [shared/config.js](shared/config.js) `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION`, overridable via `PINECONE_EMBEDDING_MODEL` env var |
-| Ingestion's read-only exploration/summarization agent | Same model as the coding agents by default (`COPILOT_MODEL`, `gpt-4o`) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAnalysis`, overridable per-call |
-| Coding agents (bugfix/general ticket implementation) | `COPILOT_MODEL` (`gpt-4o` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
-| (Unused elsewhere) cheap/fast fallback model | `COPILOT_SUMMARY_MODEL` (`gpt-4o` default) | Available via `runCopilotPrompt` for any future no-tool text-generation use |
+| Ingestion's read-only exploration/summarization agent | Same model as the coding agents by default (`COPILOT_MODEL`, `gpt-5.6-luna`) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAnalysis`, overridable per-call |
+| Coding agents (bugfix/general ticket implementation) | `COPILOT_MODEL` (`gpt-5.6-luna` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
+| (Unused elsewhere) cheap/fast fallback model | `COPILOT_SUMMARY_MODEL` (`gpt-5.6-luna` default) | Available via `runCopilotPrompt` for any future no-tool text-generation use |
 
 **Why `llama-text-embed-v2` and not a code-specialized embedding model:** everything actually
 embedded — both the ingested summaries and the ticket descriptions used to query them — is
