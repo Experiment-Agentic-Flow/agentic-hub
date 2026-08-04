@@ -48,17 +48,60 @@
   },
   "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
     "type": "api_service",
-    "purpose": "unknown - populated automatically on first RAG ingestion push",
+    "purpose": "Asynchronous service that consumes Trimble BIM model conversion messages, downloads and parses models, extracts quantity-takeoff elements and properties, uploads compressed JSON to Trimble File Service, updates MongoDB metadata, and publishes completion or failure events with SignalR notifications.",
     "techStack": [
-      "dotnet"
+      ".NET 10",
+      "ASP.NET Core minimal hosting",
+      "C#",
+      "MassTransit 8.5",
+      "Azure Service Bus",
+      "MongoDB",
+      "Azure SignalR",
+      "Trimble Connect API",
+      "TrimBim.Tools.NET",
+      "TrimbleCloud.FileService",
+      "Serilog",
+      "New Relic",
+      "AutoMapper",
+      "Swagger/Swashbuckle",
+      "Azure Key Vault Cryptography"
     ],
-    "keyModules": [],
-    "notablePatterns": []
+    "keyModules": [
+      "ProcessTrimbleModelConsumer",
+      "ModelConversionProcessor",
+      "ModelConversionStateMachine",
+      "ModelConversionState",
+      "ModelMetaDataProcessor",
+      "ModelMetaDataRepository",
+      "ConnectClientService",
+      "TrimbleFileService",
+      "QuantityTakeoffOrchestratorHub",
+      "CustomerDataProcessor",
+      "DeleteCustomerDataCdhConsumer",
+      "MassTransitContracts"
+    ],
+    "notablePatterns": [
+      "MassTransit saga state machine with Converting, Completed, and Failed states",
+      "CorrelationId-based message correlation and MongoDB saga persistence",
+      "Consumer-to-processor delegation for conversion workflow",
+      "SignalR group notifications for progress, start, completion, and failure events",
+      "TrimBim model parsing followed by property and element extraction",
+      "Temporary streamed JSON generation, gzip compression, and chunked file upload",
+      "MongoDB upsert of file identifiers and property-set definitions",
+      "Customer data deletion through a CDH message consumer",
+      "Local Service Bus queue/topic names can be prefixed by the current username",
+      "AccessToken is read from a message header and Base64-decoded before model download"
+    ],
+    "updatedAt": "2026-08-04T14:01:33.645Z"
   },
   "_ingestionState": {
     "Experiment-Agentic-Flow/quantitytakeoffservice": {
       "lastSha": "4993c84e0e09c83f9ddac358bbcec2b6287e00f2",
       "updatedAt": "2026-08-04T13:57:31.583Z"
+    },
+    "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
+      "lastSha": "3b702ad31cc30acdd8143b5fde01131987fdb480",
+      "updatedAt": "2026-08-04T14:01:33.646Z"
     }
   }
 }
