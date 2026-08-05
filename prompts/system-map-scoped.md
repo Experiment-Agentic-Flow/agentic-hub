@@ -5,13 +5,12 @@ Thoroughness matters more than brevity here - unlike a short summary, it is fine
 to be long, since it is generated rarely (once, then only regenerated when {{SCOPE}}'s architecture or
 your instructions meaningfully change) rather than on every push.
 
-This is a **scoped** map, not a whole-monorepo one: focus your deep exploration on `apps/{{SCOPE}}/**`
-and `libs/{{SCOPE}}/**` (adjust if the actual paths differ once you look - check the workspace layout
-first). Skim just enough of the repo-wide config (nx.json, tsconfig path mappings, top-level
+This is a **scoped** map, not a whole-monorepo one: focus your deep exploration on {{SCOPE}}'s app
+folder and its real dependency closure, not just anything that happens to share its name.
+{{PATHS_BLOCK}}
+Skim just enough of the repo-wide config (nx.json, tsconfig path mappings, top-level
 `.eslintrc.json` module-boundary rules) to state the *general* layering conventions {{SCOPE}}'s own
-libs must follow, and skim just enough of any *other* domain's libs that {{SCOPE}} actually imports
-from (e.g. `libs/shared/**`) to describe that dependency accurately - but do not deep-dive into
-unrelated domains/apps.
+libs must follow - but do not deep-dive into libs/apps outside the paths above.
 
 Explore the checked-out repository in your current working directory using your read tool: any
 README(s) inside {{SCOPE}}'s own folders, `project.json` files (tags, dependencies), and enough real

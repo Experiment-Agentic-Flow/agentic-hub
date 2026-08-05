@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { generateSystemMap } from './summarizer.js';
 import { saveSystemMap } from '../shared/systemMap.js';
+import { resolveAppLibDependencies } from './nxDependencyResolver.js';
 
 /**
  * On-demand system-map generation, run manually (workflow_dispatch) rather than on every push -
@@ -11,7 +12,9 @@ import { saveSystemMap } from '../shared/systemMap.js';
  *
  * Required: REPO (org/name), REPO_DIR (existing checkout).
  * Optional: SCOPE (a single app + its libs within a monorepo, e.g. "livecount" - narrows
- * exploration and produces a separate, smaller map instead of the whole-repo one).
+ * exploration and produces a separate, smaller map instead of the whole-repo one). When set, the
+ * app's real lib dependency closure is resolved first (nxDependencyResolver.js) rather than
+ * guessing paths by naming convention.
  */
 function requireEnv(name) {
   const value = process.env[name];
@@ -24,8 +27,19 @@ async function main() {
   const repoDir = requireEnv('REPO_DIR');
   const scope = process.env.SCOPE || undefined;
 
+  let resolvedPaths;
+  if (scope) {
+    const { appPath, libPaths } = resolveAppLibDependencies({ repoDir, appName: scope });
+    if (appPath) {
+      resolvedPaths = [appPath, ...libPaths];
+      console.log(`[${repo} :: ${scope}] resolved ${libPaths.length} lib dependenc${libPaths.length === 1 ? 'y' : 'ies'} from real imports`);
+    } else {
+      console.log(`[${repo} :: ${scope}] couldn't resolve real dependencies (no matching project.json or not an @hcworkspace Nx workspace) - falling back to naming-convention guessing`);
+    }
+  }
+
   console.log(`[${repo}${scope ? ` :: ${scope}` : ''}] generating system map...`);
-  const content = await generateSystemMap({ repo, cwd: repoDir, scope });
+  const content = await generateSystemMap({ repo, cwd: repoDir, scope, resolvedPaths });
   saveSystemMap(repo, content, scope);
   console.log(`[${repo}${scope ? ` :: ${scope}` : ''}] wrote system map (${content.length} chars) to data/system-map/`);
 }
