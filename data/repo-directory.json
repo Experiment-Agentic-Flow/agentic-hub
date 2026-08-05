@@ -350,42 +350,56 @@
       {
         "name": "ecui",
         "path": "apps/ecui",
-        "purpose": "Angular application for construction estimating workflows, including estimates, projects, cost libraries, labor and equipment databases, drawings, and graphical takeoff.",
+        "purpose": "ECUI is an Angular/Nx application providing authenticated estimating workflows, including projects, estimates, cost libraries, units, formulas, labor and equipment databases, work breakdown structures, drawings, and graphical takeoff.",
         "keyModules": [
           "AppModule",
-          "AppRoutingModule",
           "AppComponent",
+          "AppRoutingModule",
           "CompanySetupService",
           "CompanySetupEffects",
-          "MenuDefinition",
+          "LoginOrchestrationEffects",
+          "OrchestrationEffects",
+          "AccessForbiddenComponent",
           "MenuConfigFactory",
+          "MenuHomeConfig",
+          "MenuSharedConfig",
+          "EcuiGraphicalTakeoffFeatureModule",
+          "SharedEstimatesFeatureModule",
+          "SharedProjectsFeatureModule",
+          "SharedCostLibraryFeatureModule",
+          "SharedCostTypesFeatureModule",
+          "SharedLabEqDbFeatureModule",
+          "SharedWorkBreakdownStructuresFeatureModule",
+          "SharedUnitsFeatureModule",
+          "FormulasModule",
           "EcuiGraphicalTakeoffStateService",
           "EcuiSharedEstimatesStateService",
+          "EcuiSharedCostLibraryStateService",
+          "EcuiSharedTakeoffCalculatorStateService",
           "SharedEstimatingGraphicalTakeoffFeatureStateService",
-          "AccessForbiddenComponent",
-          "SharedEstimatesFeatureModule",
-          "EcuiGraphicalTakeoffFeatureModule",
-          "SharedCostLibraryFeatureModule",
-          "SharedProjectsFeatureModule",
-          "SharedDrawingsFeatureModule",
-          "SharedWorkBreakdownStructuresFeatureModule",
-          "SharedLabEqDbFeatureModule",
-          "SharedUnitsFeatureModule",
-          "FormulasModule"
+          "SharedAnnotationStateService",
+          "SharedLayerStateService",
+          "SharedScalesStateService",
+          "ViewsDataAccessStateService",
+          "UtilityService",
+          "AccessGuard",
+          "canActivateWithValidSelectedCustomerAndRegion"
         ],
         "notablePatterns": [
-          "Angular NgModule application integrated with Nx feature, data-access, model, and API libraries",
-          "NgRx root and feature state with localStorage synchronization and authentication-triggered state clearing",
-          "Lazy-loaded routing for estimates, drawings, graphical takeoff, settings, and application features",
-          "Authentication, access, customer, license, and selected-region route guards",
-          "Facade-backed state adapter services exposed through dependency-injection tokens",
-          "Company setup imports for cost-library and units data with parallel execution, polling, timeout, and telemetry logging",
-          "Multi-window and browser-storage synchronization for estimates, drawings, and detached graphical takeoff windows",
-          "Transloco internationalization with English-US and Dutch translations",
-          "Environment-specific builds for dev, staging, and production"
+          "Angular NgModule bootstrap with AppComponent rather than a standalone root component.",
+          "Nx application composition using shared domain feature and data-access libraries.",
+          "Lazy-loaded routing for graphical takeoff, drawings, settings, terms of service, and error handling.",
+          "NgRx root and feature state with effects for authentication orchestration and company setup imports.",
+          "Company cost-library and units imports run in parallel and poll backend status until completion or timeout.",
+          "Route access combines authentication, application access, and selected customer/region guards.",
+          "StateService implementations are registered through useExisting provider aliases for shared library contracts.",
+          "Transloco provides runtime localization with English and Dutch translation assets.",
+          "ngx-multi-window synchronizes estimate updates and application state across browser windows or tabs.",
+          "Environment-specific Angular build configurations replace environment files for dev, staging, and production.",
+          "Wijmo and DevExtreme are used for UI controls and grids, with application-level license initialization and styling overrides."
         ],
         "tags": [],
-        "updatedAt": "2026-08-04T14:07:13.298Z"
+        "updatedAt": "2026-08-05T04:50:41.786Z"
       },
       {
         "name": "ecui-e2e",
@@ -685,56 +699,50 @@
       {
         "name": "hcui",
         "path": "apps/hcui",
-        "purpose": "Angular/Nx hcui application for Trimble MEP estimating workflows, including projects, estimates, takeoff, drawings, content libraries, closeout, reports, authentication, licensing, navigation, and user settings.",
+        "purpose": "Angular/Nx web application for Trimble MEP estimating workflows, including authentication, customer and project management, estimates, graphical and drawing-based takeoff, content libraries, assemblies, favorites, work-breakdown structures, reports, bid breakdowns, and estimate closeout.",
         "keyModules": [
           "AppModule",
           "AppComponent",
           "AppRoutingModule",
-          "AppEndpointModule",
           "OrchestrationEffects",
           "LoginOrchestrationEffects",
           "TakeoffWorkflowsOrchestrationEffects",
           "OrchestrationFacade",
-          "MenuDefinition",
-          "MenuConfigFactory",
-          "MenuHomeConfig",
-          "MenuEstimatesConfig",
-          "MenuProjectsConfig",
           "NavigationService",
           "NavigationStateService",
-          "BreadcrumbRoutingResolver",
-          "WbsNodesLazyResolver",
+          "AllEstimatesMenuService",
           "ContentProviderFactory",
           "LibraryTakeoffSearchConfigFactory",
           "TrimbleContentExplorerSearchConfigFactory",
-          "AllEstimatesMenuService",
-          "ContentViewTypeService",
-          "McaaUserSettingComponent",
-          "IEnvironment",
-          "IEnvironmentTest",
-          "SharedEstimatingGraphicalTakeoffFeatureStateService",
-          "TakeoffCustomItemsStateService",
-          "TakeoffFavoritesFeatureStateService",
-          "TakeoffLibraryStateService",
-          "SummaryFeatureStateService",
-          "SharedLayerStateService",
-          "SharedAnnotationStateService",
-          "SharedContentPricingStateService"
+          "BreadcrumbRoutingResolver",
+          "WbsNodesLazyResolver",
+          "ProjectsComponent",
+          "AllEstimatesComponent",
+          "EstimatesComponent",
+          "EstimateTakeoffComponent",
+          "EstimateLandingPageComponent",
+          "AssembliesComponent",
+          "AssemblyBuilderComponent",
+          "ManageTypicalsComponent",
+          "FavoriteListsContainerComponent",
+          "ReportsComponent",
+          "BidBreakdownComponent",
+          "BidBreakdownDefinitionsComponent",
+          "McaaAuthenticationComponent",
+          "McaaUserSettingComponent"
         ],
         "notablePatterns": [
-          "Angular NgModule application bootstrapped from main.ts with AppComponent and Trimble Modus custom elements.",
-          "Nx project configuration provides build, serve, test, lint, localization extraction, environment replacements, and multiple dev/staging/production configurations.",
-          "NgRx Store, reducers, selectors, facades, and effects coordinate authentication, customer selection, feature-flagged work, estimate selection, project changes, takeoff workflows, and navigation.",
-          "Angular Router uses authentication and feature-flag guards, resolvers, auxiliary routes, nested routes, and lazy-loaded feature modules.",
-          "Menu configuration is reactive with RxJS combineLatest and changes based on selected project or estimate, drawing availability, estimate version, industries, and feature flags.",
-          "Application-wide state is adapted through local module-services implementing or extending shared StateService contracts.",
-          "Transloco provides localization and locale configuration; DevExtreme localization and licensing are initialized at application startup.",
-          "Environment-specific configuration supplies service URLs, regions, locales, feature flags, licensing, analytics, and integration settings.",
-          "Cross-window synchronization uses ngx-multi-window and storage events; NgRx state includes local-storage synchronization and LogRocket middleware.",
-          "The application integrates shared MEP authentication, projects, estimates, drawings, annotations, layers, scales, schedules, content providers, attachments, licensing, Gainsight, LogRocket, and reporting modules."
+          "Nx application with Angular NgModule-based bootstrapping and SCSS styling",
+          "NgRx root and feature stores with reducers, selectors, effects, facades, and persisted local-storage state",
+          "Route guards, breadcrumb resolvers, lazy-loaded feature routes, and route data for navigation configuration",
+          "Feature configuration supplied through forRoot modules and application-specific provider tokens",
+          "Environment-specific Angular build configurations for local, development, staging, production, and EU deployments",
+          "Transloco internationalization with locale synchronization to DevExtreme localization",
+          "Multi-window state coordination using ngx-multi-window and browser storage events",
+          "Integration with shared estimating, authentication, licensing, navigation, projects, content-provider, drawings, and reporting libraries"
         ],
         "tags": [],
-        "updatedAt": "2026-08-04T14:08:19.264Z"
+        "updatedAt": "2026-08-05T04:50:36.957Z"
       },
       {
         "name": "hcui-e2e",
@@ -800,7 +808,7 @@
       {
         "name": "livecount",
         "path": "apps/livecount",
-        "purpose": "Angular application for LiveCount estimating workflows, including customer and project selection, job management, drawings, 2D graphical takeoff, 3D quantity takeoff, models, attachments, authentication, licensing, and environment-specific deployment.",
+        "purpose": "Angular/Nx LiveCount application for authenticated estimating workflows, including customer and project selection, job management, drawings, models, graphical and quantity takeoff, attachments, settings, and embedded login.",
         "keyModules": [
           "AppModule",
           "AppComponent",
@@ -808,35 +816,36 @@
           "AppEndpointModule",
           "LoginEffects",
           "OrchestrationEffects",
-          "LiveCountEmbedLoginComponent",
           "SetJobComponent",
           "SetJobErrorComponent",
-          "MenuConfigFactory",
-          "MenuDefinition",
-          "MenuHomeConfig",
-          "MenuJobsConfig",
-          "MenuProjectsConfig",
-          "NavigationService",
-          "AllJobsMenuService",
+          "LiveCountEmbedLoginComponent",
+          "LivecountJobsFeatureModule",
+          "LivecountProjectsFeatureModule",
+          "LivecountModelsFeatureModule",
+          "QuantityTakeoffFeatureModule",
+          "LiveCountMessageDataAccessModule",
           "LivecountConnectLicenseService",
-          "LivecountJobsFeatureStateService",
-          "QuantityTakeoffFeatureStateService",
-          "QuantityTakeoffDataAccessStateService",
-          "ConnectViewerFeatureStateService",
-          "ProjectsSharedFeatureStateService"
+          "NavigationService",
+          "MenuConfigFactory",
+          "AllJobsMenuService",
+          "localStorageSyncReducer",
+          "clearState"
         ],
         "notablePatterns": [
-          "Legacy Angular NgModule bootstrap with Angular components and feature modules.",
-          "NgRx root store, meta-reducers, router integration, LoginEffects, and OrchestrationEffects coordinate authentication, settings, feature flags, projects, jobs, estimates, and navigation.",
-          "Route-level lazy loading is used for models, graphical takeoff, quantity takeoff, settings, error handling, and detached drawing viewing.",
-          "Functional route guards and resolvers enforce authentication, customer/region, project, job, drawing, license, and feature-flag prerequisites.",
-          "Feature behavior is controlled by environment replacements, license state, and feature flags such as LC_3dQuantityTakeoff.",
-          "Transloco provides localized translations for en-US, en-GB, nl, and fr, with locale synchronization to DevExtreme.",
-          "Angular signals and computed values are used for connection interruption state and feature configuration alongside RxJS observables.",
-          "LiveCount integrates SignalR connection status, Trimble Connect licensing/projects, LogRocket, Gainsight, chat bot, and multi-window synchronization."
+          "Angular NgModule bootstrap with a root AppComponent",
+          "Nx feature, data-access, and shared-library composition",
+          "Lazy-loaded routes for models, graphical takeoff, quantity takeoff, settings, errors, and detached drawing viewing",
+          "Route guards and resolvers enforce authentication, customer, region, project, job, license, drawing, and feature-flag prerequisites",
+          "NgRx root store with effects-based login and application orchestration",
+          "NgRx state persisted and synchronized through localStorage, including multi-tab storage actions",
+          "Angular signals and computed state used alongside RxJS observables",
+          "SignalR connection interruption status is debounced and reported through LogRocket",
+          "Environment-specific builds support dev, staging, production, migration, and local migration configurations",
+          "Transloco provides application-level localization with region-driven locale selection",
+          "Feature flags control 3D quantity takeoff, graphical takeoff, AI tools, support assistant context, and other capabilities"
         ],
         "tags": [],
-        "updatedAt": "2026-08-04T14:08:28.667Z"
+        "updatedAt": "2026-08-05T04:50:35.245Z"
       },
       {
         "name": "livecount-studio",
@@ -13408,40 +13417,38 @@
       {
         "name": "shared-estimating-annotation-layers-data-access",
         "path": "libs/shared/estimating/annotation-layers/data-access",
-        "purpose": "Provides data access and state management for estimating annotation layers and layer templates, including HTTP layer CRUD, Trimble Organizer tree/node operations, default regional templates, and UI state.",
+        "purpose": "Provides NgRx state management, effects, facades, HTTP services, default configuration, and translation scope for estimating annotation layers and layer templates.",
         "keyModules": [
           "SharedLayersDataAccessModule",
           "LayersFacade",
           "LayersEffects",
-          "LayersState and reducer",
-          "layersQuery selectors",
-          "layersActions",
+          "layersReducer",
+          "layersQuery",
           "AnnotationLayersService",
+          "AnnotationLayersTemplatesService",
           "AnnotationLayersApiService",
-          "LayersOrganizerService",
-          "OrganizerClient",
           "DefaultLayersProvider",
-          "LayersConfig"
+          "layersActions",
+          "featureScopeFactory"
         ],
         "notablePatterns": [
-          "NgRx feature state registered under the layers feature key",
-          "Facade exposes observable and Angular signal-based selectors and dispatch methods",
-          "Effects coordinate annotation-layer HTTP APIs and Trimble Organizer template/tree APIs",
-          "SharedLayersDataAccessModule.forRoot provides runtime configuration and binds AnnotationLayersApi to AnnotationLayersApiService",
-          "Organizer operations use authenticated access tokens, retry handling, and activation/claims refreshes",
-          "Default layer templates vary by region and are created only when matching company annotation styles exist",
-          "Transloco feature-scoped translations are loaded from the local i18n directory"
+          "NgRx feature state under the layers feature key with actions, reducer, selectors, facade, and effects",
+          "Angular injectable services use HttpClient and ANNOTATIONS_BASE_URI for layer and layer-template CRUD operations",
+          "Layer template creation and import use forkJoin for multiple related API requests",
+          "Default layer templates vary by region and are initialized when license, region, and company styles are available",
+          "Active layer name is synchronized with persisted user settings using Angular signals and effects",
+          "SharedLayersDataAccessModule registers NgRx feature state/effects, Transloco scope, and the AnnotationLayersApi abstraction"
         ],
         "tags": [
           "scope:estimating",
           "type:data-access"
         ],
-        "updatedAt": "2026-08-04T14:39:29.153Z"
+        "updatedAt": "2026-08-05T04:50:34.601Z"
       },
       {
         "name": "shared-estimating-annotation-layers-feature",
         "path": "libs/shared/estimating/annotation-layers/feature",
-        "purpose": "Angular feature library for managing estimating annotation layers and layer templates, including selection, creation, editing, deletion, importing, and annotation-layer assignment.",
+        "purpose": "Angular feature library for selecting, managing, creating, editing, deleting, and importing estimating annotation layers and layer templates.",
         "keyModules": [
           "SharedLayersFeatureModule",
           "AnnotationLayerComponent",
@@ -13455,34 +13462,35 @@
           "ManageAnnotationLayersGridConfig",
           "ManageAnnotationLayersGridColumnDefinition",
           "LayerTemplatesGridConfig",
-          "LayerTemplatesGridColumnDefinition"
+          "LayerTemplatesGridColumnDefinition",
+          "featureScopeName",
+          "featureScopeFactory"
         ],
         "notablePatterns": [
-          "NgModule-based Angular components with standalone: false",
-          "Facade-driven state and actions through LayersFacade, with application state supplied by abstract StateService",
-          "RxJS Observable streams, combineLatest, takeUntil, and takeUntilDestroyed for reactive data and lifecycle cleanup",
-          "DevExtreme MEP grid configurations for layer and layer-template management",
-          "Reactive forms with required, industry, and duplicate-layer-name validation",
-          "Transloco scoped translations using the layersFeature scope",
-          "Layer-template import filters by estimate industry, avoids duplicate layer names, and remaps style references to job styles",
-          "Layer selection updates selected annotation groups through AnnotationsApi"
+          "Legacy Angular NgModule with non-standalone components",
+          "LayersFacade-driven reactive state using RxJS observables",
+          "DevExtreme and shared MEP grid, toolbar, dialog, popup, select, and tag-box integrations",
+          "Reactive forms with required, duplicate-name, industry, and duplicate-layer-name validation",
+          "Transloco scoped internationalization using the layersFeature scope",
+          "Layer-template creation and updates produce LayerNode create, update, and deletion payloads",
+          "Layer-template import filters by estimate industry, avoids duplicate layer names, and maps template style references to job styles",
+          "Explicit Subject-based teardown with takeUntil and takeUntilDestroyed",
+          "Per-user layer-template grid state storage"
         ],
         "tags": [
           "scope:estimating",
           "type:feature"
         ],
-        "updatedAt": "2026-08-04T14:39:29.419Z"
+        "updatedAt": "2026-08-05T04:50:40.182Z"
       },
       {
         "name": "shared-estimating-annotation-layers-model",
         "path": "libs/shared/estimating/annotation-layers/model",
-        "purpose": "Defines shared TypeScript data models and request/response contracts for estimating annotation layers, layer templates, and hierarchical layer trees.",
+        "purpose": "Shared model library defining TypeScript interfaces, request payloads, metadata, and constants for estimating annotation layers and layer templates.",
         "keyModules": [
           "Layer",
           "DEFAULT_LAYER_ID",
           "DEFAULT_LAYER_NAME",
-          "CreateLayerRequest",
-          "PatchLayerRequest",
           "LayerNode",
           "LayerMetadata",
           "LayerNodeChange",
@@ -13492,25 +13500,25 @@
           "LayerTemplateMetadata",
           "LayerTemplateToCreate",
           "LayerTemplateToUpdate",
-          "LayerTemplateTreeToCreate",
-          "LayerTemplateTreeToUpdate",
           "LayerToImport",
-          "LayerTreeResponse",
-          "LayerTreeToCreate"
+          "CreateLayerRequest",
+          "PatchLayerRequest",
+          "CreateLayerTemplateRequest",
+          "PatchLayerTemplateRequest"
         ],
         "notablePatterns": [
-          "Model-only Nx library with scope:estimating and type:model tags.",
-          "All public models are re-exported through src/index.ts barrel exports.",
-          "Create/update contracts use separate interfaces, with LayerNodeChange as a union of LayerNodeToCreate and LayerNodeToUpdate.",
-          "Layer templates and trees model hierarchical forest/tree relationships using forestId, treeId, and nested layer collections.",
-          "LayerTreeResponse extends trimble-connect-sdk TreeResponse to expose an optional forestId.",
-          "Optional properties represent deletions, style references, descriptions, and patchable fields."
+          "Nx library tagged scope:estimating and type:model",
+          "Exports all public models through src/index.ts",
+          "Uses TypeScript interfaces and type unions rather than runtime classes or services",
+          "Separates create and update payloads, with optional deletion and identifier fields for updates",
+          "Represents layer-template trees through LayerNode and LayerNodeChange types",
+          "Uses optional style and metadata references to support annotation styling"
         ],
         "tags": [
           "scope:estimating",
           "type:model"
         ],
-        "updatedAt": "2026-08-04T14:39:49.400Z"
+        "updatedAt": "2026-08-05T04:50:35.754Z"
       },
       {
         "name": "shared-estimating-annotation-styles-api",
@@ -18133,8 +18141,8 @@
       "updatedAt": "2026-08-04T14:01:33.646Z"
     },
     "Experiment-Agentic-Flow/mepworkspace": {
-      "lastSha": "9a0e3c4ce9853cba422bee21960cae9f54228c5c",
-      "updatedAt": "2026-08-04T15:17:40.448Z"
+      "lastSha": "6097261ecfaa168fabc0a60c8a449a57cab19b75",
+      "updatedAt": "2026-08-05T04:50:41.802Z"
     }
   }
 }
