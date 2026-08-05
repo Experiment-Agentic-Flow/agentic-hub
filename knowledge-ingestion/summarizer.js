@@ -48,15 +48,21 @@ export async function summarizeMonorepoProject({ repo, projectName, cwd }) {
 
 /**
  * Deliberately separate from summarizeApiService/summarizeMonorepoProject: this produces one
- * long-form Markdown architecture reference for the whole repo (layering rules, subsystem
- * relationships, cross-cutting patterns), not a compact per-ticket-routing summary. It's meant to
- * be generated rarely (on demand, not on every push) and consumed rarely (per high-level
- * initiative, e.g. Epic spec generation) - verbosity here is a feature, not a cost problem, since
+ * long-form Markdown architecture reference (layering rules, subsystem relationships,
+ * cross-cutting patterns), not a compact per-ticket-routing summary. It's meant to be generated
+ * rarely (on demand, not on every push) and consumed rarely (per high-level initiative, e.g. Epic
+ * spec generation) - verbosity here is a feature, not a cost problem, since
  * data/repo-directory.json stays the cheap/frequent artifact for per-ticket candidate resolution.
  * Uses GEMINI_MODEL (not GEMINI_SUMMARY_MODEL) since this needs deeper reasoning across a much
  * wider slice of the codebase than a single project's summary does.
+ *
+ * `scope` (optional) narrows this to a single app + its libs within a monorepo (e.g. "livecount"
+ * in mepworkspace) instead of the whole repo - useful when the whole-repo map is too broad for a
+ * high-level initiative confined to one domain. See prompts/system-map-scoped.md.
  */
-export async function generateSystemMap({ repo, cwd }) {
-  const prompt = loadPrompt('system-map', { REPO: repo });
+export async function generateSystemMap({ repo, cwd, scope }) {
+  const prompt = scope
+    ? loadPrompt('system-map-scoped', { REPO: repo, SCOPE: scope })
+    : loadPrompt('system-map', { REPO: repo });
   return runGeminiAnalysis(prompt, { cwd, model: GEMINI_MODEL, timeoutMs: 30 * 60 * 1000 });
 }
