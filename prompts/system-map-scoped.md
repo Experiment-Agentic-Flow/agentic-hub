@@ -19,17 +19,26 @@ together - not just what any single file does in isolation.
 
 Produce a Markdown document covering:
 
-1. **{{SCOPE}} overview** - what this app is for, its major features/pages, and how its libs are
-   organized (feature/ui/data-access/util/model/api or whatever the actual layering is).
-2. **Structural rules and conventions** - the layering/dependency-direction rules {{SCOPE}}'s libs
+1. **Product overview** - what business/user problem {{SCOPE}} solves, who its actual users are,
+   and where it sits relative to other products/apps it integrates with or is embedded in (if any).
+   Write this for someone who has never used the product, not just someone reading the code.
+2. **End-to-end workflows** - the real user-facing workflows/journeys {{SCOPE}} supports, described
+   step by step in plain product language first (e.g. "user opens a job → uploads a drawing →
+   performs a takeoff → results sync back to the host application"), then for each step name the
+   concrete subsystem(s)/lib(s) that actually implement it. Cover every major workflow you can
+   ground in the real code/routes/components, not just the primary happy path.
+3. **{{SCOPE}} technical overview** - how its libs are organized (feature/ui/data-access/util/model/api
+   or whatever the actual layering is), mapped back to the workflows above.
+4. **Structural rules and conventions** - the layering/dependency-direction rules {{SCOPE}}'s libs
    follow (and are constrained to via module-boundary tags), naming conventions, and anything that
    would make a proposed change to {{SCOPE}} non-compliant if violated.
-3. **Key subsystems within {{SCOPE}}** - grouped by responsibility (e.g. a specific feature area or
-   workflow), each with what it owns, its state-management approach, and which other {{SCOPE}} libs
-   or shared/cross-cutting libs it depends on.
-4. **Cross-cutting dependencies** - which `libs/shared/**` (or other domain) libraries {{SCOPE}}
+5. **Key subsystems within {{SCOPE}}** - grouped by responsibility (e.g. a specific feature area or
+   workflow), each stating both its technical responsibility AND the user-facing capability it
+   enables, its state-management approach, and which other {{SCOPE}} libs or shared/cross-cutting
+   libs it depends on.
+6. **Cross-cutting dependencies** - which `libs/shared/**` (or other domain) libraries {{SCOPE}}
    actually consumes, and for what.
-5. **Notable constraints/gotchas** - anything a new initiative inside {{SCOPE}} would need to account
+7. **Notable constraints/gotchas** - anything a new initiative inside {{SCOPE}} would need to account
    for (known architectural debt, migration-in-progress areas, non-obvious coupling).
 
 Ground every claim in what you actually found in the code/config - if something can't be determined,

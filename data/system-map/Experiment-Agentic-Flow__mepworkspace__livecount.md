@@ -1,166 +1,113 @@
-Here is the comprehensive architectural system map for the **livecount** application and its corresponding libraries:
+Here is the comprehensive system map for the **LiveCount** application and its dependency closure within the MEP Workspace monorepo.
 
-# Livecount Ecosystem: Architectural System Map
+# LiveCount System Map
 
-## 1. Executive Summary
-The **Livecount** ecosystem in `mepworkspace` is an Angular-based platform for construction takeoff and estimation. It supports:
-- **2D Graphical Takeoff (2D Canvas/Drawings)**: Taking physical dimensions from drawings with AI-assisted features.
-- **3D Quantity Takeoff (QTO)**: Visualizing 3D BIM models via Trimble Connect and processing high-performance material and structural takeoffs.
-- **Embedded Client Viewports**: Operates seamlessly as an embedded context (WebView2 or Iframe) communicating bidirectionally with host estimators (Anywhere, Classic/CM) using `postMessage` or SignalR hubs.
+## 1. Product Overview
+LiveCount is a web-based construction estimation and quantity takeoff application designed for MEP (Mechanical, Electrical, and Plumbing) professionals. It solves the business problem of accurately extracting and aggregating material quantities (lengths, areas, item counts) directly from 2D architectural drawings (PDFs) and 3D building models. 
 
----
+Its users are typically estimators who need to quantify materials for a job to build an accurate bid or estimate. LiveCount operates in two distinct operational modes:
+1. **Standalone Web Application**: Users access LiveCount directly via a browser, allowing them to navigate through Customers, Projects, and Jobs before performing takeoff.
+2. **Embedded Integration**: LiveCount is heavily designed to be embedded within other Trimble host applications (most notably **Accubid Classic** and **Trimble Cloud Console**). In this mode, the host application manages the project/job context, and LiveCount is loaded into an embedded Chromium browser (historically supporting versions as old as Chromium 67) to provide the graphical takeoff interface directly alongside the host's estimating grid.
 
-## 2. Main Applications (`apps/`)
+## 2. End-to-End Workflows
 
-### 1. `livecount` (Main Production Client App)
-* **Path**: `apps/livecount`
-* **Type**: Modular Angular Application (`AppModule`)
-* **Role**: Primary application container. Manages core routing, auth guards, licensing, and orchestrates lazy-loaded domains from `libs/livecount/` and `libs/shared/`.
-* **State**: Uses NgRx with state persistence via custom `localStorageSync` meta-reducers.
+### Authentication and Context Initialization
+- **Workflow**: A user attempts to access the application. If standalone, they are directed to Trimble Identity for login. If embedded within a host application like Accubid, an authentication code or token is passed directly via the URL to seamlessly log them in. 
+- **Subsystems**: 
+  - `libs/shared/platform/mep-authenticate/feature` (handles standard login and guards).
+  - `apps/livecount/src/app/login/livecount-embed-login.component` (specialized handling for embedded host integration).
 
-### 2. `livecount-studio` (Developer Test Bench)
-* **Path**: `apps/livecount-studio`
-* **Type**: Lightweight Angular Application
-* **Role**: Simulates host environments. Embeds `livecount` in an iframe, allowing developers to inspect postMessage payloads, mock host events, view client schemas, and trigger data migration tasks.
+### Job Selection and Preparation (Standalone Mode)
+- **Workflow**: The user selects a Customer/Region, navigates to a Project, and then opens a specific Job. 
+- **Subsystems**:
+  - Route guards (`with-valid-selected-customer-and-region.guard`, `with-selected-project.guard`, `with-standalone-browser-app.guard`) enforce this flow.
+  - `libs/livecount/projects/feature` and `libs/livecount/jobs/feature` provide the UI and state for selecting the working context. 
 
----
+### 2D Graphical Takeoff (Drawing Measurement)
+- **Workflow**: The user opens a 2D PDF drawing. They select a measurement tool (e.g., Length, Area, Count, or Auto-Count pattern search) from a floating toolbar, scale/calibrate the drawing, and click/drag on the drawing canvas to draw annotations.
+- **Subsystems**: 
+  - `libs/shared/estimating/drawings/feature` (loads the drawing list and viewport).
+  - `libs/shared/estimating/graphical-takeoff/feature` (provides the layout, toolbars, and Fabric.js canvas components).
+  - `libs/shared/estimating/graphical-takeoff/data-access` (the heavy 2D engine that processes Fabric.js canvas events, manages the `active-canvas` state, and translates user clicks into model data like `takeoff-polygon` or `takeoff-line`).
 
-## 3. Domain Libraries Architecture (`libs/livecount/`)
+### 3D Model Takeoff
+- **Workflow**: If the 3D Quantity Takeoff feature flag is active, the user opens a 3D model instead of a 2D drawing. They navigate the 3D space and select model elements to generate quantity counts.
+- **Subsystems**:
+  - `libs/shared/feature-flags/data-access` (checks `LC_3dQuantityTakeoff`).
+  - `libs/livecount/connect-viewer/feature` (embeds and orchestrates the Trimble Connect 3D viewer).
 
-Livecount is structured into distinct modules following Nx DDD (Domain-Driven Design) conventions:
+### Quantity Aggregation and Grid Management
+- **Workflow**: As the user draws annotations in 2D or selects elements in 3D, the resulting quantities are aggregated in real-time in a tabular data grid occupying the bottom half of a split-screen view. The user can define, merge, or modify these takeoff items directly in the grid.
+- **Subsystems**:
+  - `libs/livecount/quantity-takeoff/feature` (contains the `TakeoffContainerComponent` which orchestrates the split-screen view, embedding either the 2D canvas or 3D viewer on top, and the `TakeoffManagerOverviewComponent` on the bottom).
+  - `libs/livecount/quantity-takeoff/ui` (provides the DevExtreme `DxDataGrid` wrappers for the takeoff grid).
 
-| Library Path | Aliased Import Path | Layer Type | Description & Purpose |
-| :--- | :--- | :--- | :--- |
-| `connect-viewer/feature` | `@hcworkspace/livecount/connect-viewer/feature` | Feature | Interfaces directly with Trimble Connect's 3D viewer API inside the viewport. |
-| `graphical-takeoff/feature` | `@hcworkspace/livecount/graphical-takeoff/feature` | Feature | Orchestrates 2D canvas drawing takeoffs, tool toggles, and drawing tools. |
-| `jobs/data-access` | `@hcworkspace/livecount/jobs/data-access` | Data Access | NgRx actions, effects, reducers, and selectors for Livecount jobs. |
-| `jobs/feature` | `@hcworkspace/livecount/jobs/feature` | Feature | Job overview dashboards, DevExtreme-backed grids, and job resolvers. |
-| `message/api` | `@hcworkspace/livecount/message/api` | API | Defines messaging contracts between the client and host interfaces. |
-| `message/data-access` | `@hcworkspace/livecount/message/data-access` | Data Access | Protocol provider orchestrating iframe postMessage, Webview2, and SignalR. |
-| `models/api` | `@hcworkspace/livecount/models/api` | API | Export definitions and interfaces for 3D model resources. |
-| `models/data-access` | `@hcworkspace/livecount/models/data-access` | Data Access | State management for adding, updating, and syncing 3D files. |
-| `models/feature` | `@hcworkspace/livecount/models/feature` | Feature | UI components for model management, version control, and selection trees. |
-| `models/model` | `@hcworkspace/livecount/models/model` | Model | Core model structures, conversions, and tree-node data models. |
-| `projects/data-access` | `@hcworkspace/livecount/projects/data-access` | Data Access | Project domain state, effects, and selectors. |
-| `projects/feature` | `@hcworkspace/livecount/projects/feature` | Feature | View components for selecting and managing projects/estimates. |
-| `quantity-takeoff/api` | `@hcworkspace/livecount/quantity-takeoff/api` | API | Public contracts for physical 3D takeoffs. |
-| `quantity-takeoff/data-access`| `@hcworkspace/livecount/quantity-takeoff/data-access` | Data Access | Coordinates OPFS (file storage), Web Workers, and state management. |
-| `quantity-takeoff/feature` | `@hcworkspace/livecount/quantity-takeoff/feature` | Feature | QTO component orchestrator, complex element grids, and calculators. |
-| `quantity-takeoff/model` | `@hcworkspace/livecount/quantity-takeoff/model` | Model | Core physical definitions (IFC classes, standard structures, properties). |
-| `quantity-takeoff/ui` | `@hcworkspace/livecount/quantity-takeoff/ui` | UI | Presentational widgets (property modifiers, custom inputs, dialogs). |
-| `quantity-takeoff-signalr/data-access`| `@hcworkspace/livecount/quantity-takeoff-signalr/data-access`| Data Access | Real-time BIM element takeoff syncing via SignalR. |
-| `signalr/data-access` | `@hcworkspace/livecount/signalr/data-access` | Data Access | Generic real-time SignalR hub wrappers and store effects. |
-| `utilities/routing` | `@hcworkspace/livecount/utilities/routing` | Utilities | Defines centralized route constant pathways (`ROUTE_PATHS`). |
+### Data Synchronization
+- **Workflow**: Takeoff modifications (additions, deletions, edits) are synchronized continuously with the backend orchestrator to ensure the host estimating system stays up to date.
+- **Subsystems**:
+  - `libs/livecount/quantity-takeoff-signalr/data-access` (maintains real-time WebSockets via SignalR hubs like `QuantityTakeoffHub` and `OrchestratorHub` to push/pull live takeoff data and model conversion progress).
 
----
+## 3. LiveCount Technical Overview
 
-## 4. Key Architectural Patterns
+LiveCount adheres to the workspace's strict Nx Domain-Driven Design architecture. 
 
-1. **Environment-Aware Protocol Wrapper (`LcMessageProtocolProvider`)**
-   - Automatically detects current runtime context (Standalone Browser, Chrome/Edge WebView2, or Embedded Iframe).
-   - Resolves communication mechanics dynamically: switches seamlessly between standard window message events (`window.parent.postMessage`) and backend-driven SignalR connections.
+The `apps/livecount` folder is an extremely thin application shell. Its primary responsibilities are bootstrapping Angular, validating global licenses (DevExtreme/Wijmo), defining the top-level route array (`app-routing.module.ts`), and setting up environment configurations for different deployments (dev, prod, staging, lc-migration, etc.).
 
-2. **High-Performance BIM Processing**
-   - **OPFS (Origin Private File System)**: Caches large, physical 3D models locally in a high-speed sandboxed browser filesystem.
-   - **Background Web Workers**: Decoupled parsing (`data-processor.worker.ts`) offloads processing-heavy data processing from the main browser UI thread.
+All actual business logic is pushed down into libraries, organized by domain (`livecount` vs `shared/estimating` vs `shared/platform`) and then layered by architectural `type`:
+- **`type:feature`** (e.g., `libs/livecount/quantity-takeoff/feature`): Contains routable components, smart container components, and UI orchestration. These libraries import `data-access` and `ui` libraries to wire state to presentation.
+- **`type:data-access`** (e.g., `libs/shared/estimating/graphical-takeoff/data-access`): Contains NgRx Actions, Reducers, Selectors, Effects, Facades, and heavy application services (like the Fabric.js canvas manager or SignalR hub connections).
+- **`type:ui`** (e.g., `libs/livecount/quantity-takeoff/ui`): Contains pure, "dumb" presentation components (often wrapping DevExtreme).
+- **`type:api` / `type:model`**: Provide strict TypeScript interfaces, enums, and data contracts that bridge domains without causing circular dependencies.
 
-3. **Complex Grids & State Coordination**
-   - Leverages **DevExtreme Data Grids** tied directly to **NgRx store states** to enable performant, Excel-like cell validations, inline property edits, and dynamic calculations.
+## 4. Structural Rules and Conventions
 
----
+Any new initiative scoped to LiveCount must obey the following workspace architectural rules, strictly enforced by `@nx/enforce-module-boundaries` in `.eslintrc.json`:
 
-## 5. Visual System Map
+1. **Unidirectional Type Layering**: 
+   - `type:ui` may only depend on `type:ui`, `type:util`, and `type:model`. It cannot inject NgRx state or API calls.
+   - `type:data-access` may only depend on `type:data-access`, `type:util`, `type:model`, and `type:api`. It cannot depend on any UI or Feature components.
+   - `type:api` may only depend on `type:model`.
+   - `type:feature` (implicitly) sits at the top and can orchestrate the layers below it.
+2. **Component Conventions**:
+   - Angular components must use the `mep-` prefix for element selectors and camelCase `mep` for directive selectors.
+   - Modules must follow standard Nx naming (e.g., `LivecountQuantityTakeoffFeatureModule`).
+3. **State Management**:
+   - All complex state must be managed via NgRx. Cross-domain state interaction should be mediated through Facade services or Actions/Selectors, never by directly mutating state across boundaries.
 
-```mermaid
-graph TD
-    classDef appClass fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff;
-    classDef libClass fill:#1a365d,stroke:#2b6cb0,stroke-width:1.5px,color:#fff;
-    classDef sharedClass fill:#2c5282,stroke:#3182ce,stroke-width:1px,color:#fff;
-    classDef extClass fill:#1c3d1f,stroke:#2f855a,stroke-width:1px,color:#fff;
+## 5. Key Subsystems within LiveCount
 
-    %% Main Apps
-    subgraph APPS [Applications]
-        LC[apps/livecount]:::appClass
-        LCS[apps/livecount-studio]:::appClass
-    end
+### Quantity Takeoff Manager (`libs/livecount/quantity-takeoff/*`)
+- **Responsibility**: The heart of LiveCount's user interface. It provides the split-screen layout (`TakeoffContainerComponent`) that marries the drawing/model viewer with the tabular data grid of measured quantities. It handles workflows like "Define Takeoff Items" and "Merge Takeoff Items".
+- **State Management**: NgRx (`QuantityTakeoffDataAccessModule`). 
+- **Dependencies**: Tightly integrates with `shared/estimating/graphical-takeoff/feature` (for the 2D view), `livecount/connect-viewer/feature` (for the 3D view), and `shared/estimating/grid-views/feature`. 
 
-    %% Bidirectional Embedding
-    LCS -- "Embeds & mocks postMessage" --> LC
+### Graphical Takeoff Engine (`libs/shared/estimating/graphical-takeoff/*`)
+- **Responsibility**: The core 2D measurement engine. It handles rendering PDFs/images onto an HTML5 canvas and provides all the interactive tools (Length, Area, Count, Scale Calibration, Auto-Count). 
+- **State Management**: Highly complex. Uses a mix of NgRx for application-level state and a heavy object-oriented framework (`canvas-manager.ts`, `active-canvas.ts`, `events.processor.ts`) wrapping `Fabric.js` for high-performance canvas state.
+- **Dependencies**: Relies heavily on third-party `fabric.js` and `pdfjs-dist`.
 
-    %% Livecount Feature Libraries
-    subgraph LIVECOUNT_LIBS [Livecount Domain Libraries]
-        LC_Routing[utilities/routing]:::libClass
-        LC_Msg[message/data-access]:::libClass
-        LC_SigR[signalr/data-access]:::libClass
-        
-        LC_JobsF[jobs/feature]:::libClass
-        LC_JobsD[jobs/data-access]:::libClass
-        
-        LC_ProjF[projects/feature]:::libClass
-        LC_ProjD[projects/data-access]:::libClass
-        
-        LC_ModelsF[models/feature]:::libClass
-        LC_ModelsD[models/data-access]:::libClass
-        LC_ModelsM[models/model]:::libClass
-        
-        LC_GTF[graphical-takeoff/feature]:::libClass
-        
-        LC_QTOF[quantity-takeoff/feature]:::libClass
-        LC_QTOD[quantity-takeoff/data-access]:::libClass
-        LC_QTOM[quantity-takeoff/model]:::libClass
-        LC_QTOU[quantity-takeoff/ui]:::libClass
-        LC_QTOSigR[quantity-takeoff-signalr/data-access]:::libClass
-        
-        LC_CV[connect-viewer/feature]:::libClass
-    end
+### SignalR Sync Engine (`libs/livecount/quantity-takeoff-signalr/data-access`)
+- **Responsibility**: Maintains persistent WebSocket connections to the backend for real-time collaborative estimating and host-application synchronization. 
+- **State Management**: Uses NgRx Effects (`quantity-takeoff-signalr.effects.ts`) to listen to local state changes and dispatch them over the `QuantityTakeoffHub`, and conversely dispatches NgRx actions when events are received from the `OrchestratorHub`.
 
-    %% Relationships Inside Domain
-    LC --> LC_Routing
-    LC --> LC_Msg
-    LC --> LC_JobsF
-    LC --> LC_ProjF
-    LC --> LC_ModelsF
-    LC --> LC_GTF
-    LC --> LC_QTOF
-    
-    LC_JobsF --> LC_JobsD
-    LC_ProjF --> LC_ProjD
-    LC_ModelsF --> LC_ModelsD
-    LC_ModelsD --> LC_ModelsM
-    
-    LC_QTOF --> LC_QTOD
-    LC_QTOF --> LC_QTOU
-    LC_QTOD --> LC_QTOM
-    LC_QTOF --> LC_CV
-    LC_QTOD -- "Uses SignalR sync" --> LC_QTOSigR
-    LC_QTOSigR --> LC_SigR
-    
-    %% External Integrations
-    subgraph EXTERNAL [External & Host APIs]
-        TC_Viewer[Trimble Connect 3D Viewer]:::extClass
-        BE_API[Backend APIs & Hubs]:::extClass
-    end
-    
-    LC_CV -- "Workspace API / iframe" --> TC_Viewer
-    LC_Msg -- "SignalR Connection" --> BE_API
-    LC_QTOD -- "OPFS & Web Workers" --> LC_QTOD
+### Connect Viewer (`libs/livecount/connect-viewer/feature`)
+- **Responsibility**: Provides the 3D model viewing capability by embedding Trimble Connect's 3D viewer iframe and bridging its events into the LiveCount data flow.
 
-    %% Shared Libraries Dependencies
-    subgraph SHARED_LIBS [Core Shared Libraries]
-        SH_Auth[shared/platform/mep-authenticate]:::sharedClass
-        SH_Lic[shared/platform/mep-license]:::sharedClass
-        SH_Draw[shared/estimating/drawings]:::sharedClass
-        SH_Annot[shared/estimating/annotations]:::sharedClass
-        SH_UI[shared/user-interface]:::sharedClass
-    end
+## 6. Cross-Cutting Dependencies
 
-    LC --> SH_Auth
-    LC --> SH_Lic
-    LC_JobsF --> SH_Draw
-    LC_GTF --> SH_Annot
-    LC_QTOF --> SH_Annot
-    LC_QTOF --> SH_UI
-```
+LiveCount is not an isolated silo; it acts as a host application that consumes heavily from the `libs/shared` domains:
+- **`libs/shared/estimating/**`**: LiveCount consumes standard estimating concepts across the monorepo, primarily `drawings`, `annotations`, `autocount`, `estimates`, and `schedules`. The graphical takeoff engine itself lives in `shared` because its underlying canvas capabilities might be consumed by other apps, even if LiveCount is its primary user.
+- **`libs/shared/platform/**`**: Provides core infrastructural capabilities like `mep-authenticate` (Trimble ID), `mep-license` (validation), `gainsight` / `logrocket` (analytics and telemetry), and `mep-chat-bot`.
+- **`libs/shared/user-interface/**`**: Provides the shared MEP design system wrappers, including `mep-grid`, `mep-dialog`, `mep-spinner`, and `mep-chips`.
+
+## 7. Notable Constraints and Gotchas
+
+An engineer designing a new feature for LiveCount must account for the following architectural constraints:
+
+1. **Embedded Chromium Environment**: Because LiveCount is embedded inside Accubid Classic using older Chromium wrappers (e.g., Chromium 67 for Accubid Classic 15), **modern CSS/JS features must be used with extreme caution**. The application explicitly maintains build configurations (e.g., `npm run build-livecount:dev-local`) to test output against older browser engines. Do not assume modern Web APIs (like `ResizeObserver` or advanced CSS Grid capabilities) will work flawlessly without polyfills or fallback testing.
+2. **Split-Brain State (NgRx vs Fabric.js)**: The `graphical-takeoff` subsystem maintains state in two places: the reactive NgRx store and the imperative `Fabric.js` canvas object model. Code modifying takeoff annotations must ensure both the canvas objects and the NgRx store remain in absolute sync. Direct mutation of the canvas without dispatching corresponding NgRx actions will cause grid desynchronization.
+3. **Heavy Third-Party License Validation**: LiveCount depends on DevExtreme for its complex data grids and Wijmo. Both require strict initialization routines (`validateDevExtremeLicense()`, `validateWijmoLicense()`) that must run before the application bootstraps. 
+4. **Feature Flag Routing**: Major structural changes to the application (like 3D quantity takeoff) are deeply embedded into the routing layer via feature flag guards (`featureFlagGuard: { name: 'LC_3dQuantityTakeoff' ... }`). New high-level workflows should follow this pattern to allow safe, targeted rollouts.
 
 ---
 

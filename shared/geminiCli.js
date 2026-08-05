@@ -16,8 +16,13 @@ export const GEMINI_SUMMARY_MODEL = process.env.GEMINI_SUMMARY_MODEL || 'flash';
  * re-splits our multi-line prompt argument on cmd.exe's quoting rules. cross-spawn resolves and
  * invokes the shim correctly on Windows (used by npm/husky for exactly this problem) while
  * behaving like plain child_process.spawn elsewhere.
+ *
+ * `prompt` is piped via stdin rather than passed as a `-p`/positional CLI argument - a long
+ * prompt (e.g. a system map's resolved-dependency list) can otherwise exceed the OS command-line
+ * length limit ("the command line is too long" on Windows). Gemini CLI's headless mode triggers
+ * on non-TTY input regardless, which spawned stdio always is here.
  */
-function runGemini(args, { cwd, timeoutMs }) {
+function runGemini(args, { cwd, timeoutMs, prompt }) {
   return new Promise((resolve, reject) => {
     // Belt-and-suspenders alongside the --skip-trust arg: some CLI versions still hit the
     // trust-folder check before parsing flags, so the env var form is set too.
@@ -32,6 +37,7 @@ function runGemini(args, { cwd, timeoutMs }) {
       if (code !== 0) reject(new Error(`gemini exited with code ${code}: ${stderr || stdout}`));
       else resolve(stdout);
     });
+    child.stdin.end(prompt);
   });
 }
 
@@ -62,7 +68,6 @@ function parseGeminiOutput(stdout) {
  */
 export async function runGeminiAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 1000, model = GEMINI_MODEL } = {}) {
   const args = [
-    '-p', prompt,
     '-m', model,
     '--skip-trust', // cwd is a throwaway ingestion checkout - no interactive session to answer the trust dialog
     '--approval-mode', 'default',
@@ -70,7 +75,7 @@ export async function runGeminiAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 100
     '--output-format', 'json',
   ];
 
-  const stdout = await runGemini(args, { cwd, timeoutMs });
+  const stdout = await runGemini(args, { cwd, timeoutMs, prompt });
   return parseGeminiOutput(stdout);
 }
 
@@ -83,7 +88,6 @@ export async function runGeminiAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 100
  */
 export async function runGeminiAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000, model = GEMINI_MODEL } = {}) {
   const args = [
-    '-p', prompt,
     '-m', model,
     '--skip-trust', // cwd is a throwaway job-scoped checkout - no interactive session to answer the trust dialog
     '--approval-mode', 'yolo',
@@ -91,6 +95,6 @@ export async function runGeminiAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000, 
     '--output-format', 'json',
   ];
 
-  const stdout = await runGemini(args, { cwd, timeoutMs });
+  const stdout = await runGemini(args, { cwd, timeoutMs, prompt });
   return parseGeminiOutput(stdout);
 }

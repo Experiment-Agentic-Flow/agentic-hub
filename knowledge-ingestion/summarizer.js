@@ -65,8 +65,10 @@ export async function summarizeMonorepoProject({ repo, projectName, cwd }) {
  * app depends on can live under an entirely different domain folder (e.g. libs/shared/**). Falls
  * back to naming-convention guessing (no paths block) if resolution found nothing.
  */
-/** Safety net against a still-large resolved dependency list blowing past the OS command-line length limit. */
-const MAX_RESOLVED_PATHS = 80;
+/** Safety net against a pathological dependency closure ballooning the prompt/context size - no
+ * longer needed to dodge an OS command-line length limit, since the prompt is piped via stdin
+ * (see shared/geminiCli.js), but still worth bounding. */
+const MAX_RESOLVED_PATHS = 300;
 
 export async function generateSystemMap({ repo, cwd, scope, resolvedPaths }) {
   const truncated = resolvedPaths?.length > MAX_RESOLVED_PATHS;
