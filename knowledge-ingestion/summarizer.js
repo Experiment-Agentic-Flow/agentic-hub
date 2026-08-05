@@ -1,4 +1,4 @@
-import { runGeminiAnalysis, GEMINI_SUMMARY_MODEL } from '../shared/geminiCli.js';
+import { runGeminiAnalysis, GEMINI_SUMMARY_MODEL, GEMINI_MODEL } from '../shared/geminiCli.js';
 import { loadPrompt } from '../shared/promptTemplate.js';
 
 /**
@@ -44,4 +44,19 @@ export async function summarizeMonorepoProject({ repo, projectName, cwd }) {
   } catch {
     return { purpose: text.slice(0, 500), keyModules: [], notablePatterns: [] };
   }
+}
+
+/**
+ * Deliberately separate from summarizeApiService/summarizeMonorepoProject: this produces one
+ * long-form Markdown architecture reference for the whole repo (layering rules, subsystem
+ * relationships, cross-cutting patterns), not a compact per-ticket-routing summary. It's meant to
+ * be generated rarely (on demand, not on every push) and consumed rarely (per high-level
+ * initiative, e.g. Epic spec generation) - verbosity here is a feature, not a cost problem, since
+ * data/repo-directory.json stays the cheap/frequent artifact for per-ticket candidate resolution.
+ * Uses GEMINI_MODEL (not GEMINI_SUMMARY_MODEL) since this needs deeper reasoning across a much
+ * wider slice of the codebase than a single project's summary does.
+ */
+export async function generateSystemMap({ repo, cwd }) {
+  const prompt = loadPrompt('system-map', { REPO: repo });
+  return runGeminiAnalysis(prompt, { cwd, model: GEMINI_MODEL, timeoutMs: 30 * 60 * 1000 });
 }
