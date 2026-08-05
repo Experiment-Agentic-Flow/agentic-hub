@@ -1,7 +1,4 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import crossSpawn from 'cross-spawn';
 
 // Google Gemini CLI (`gemini`) must be installed and authenticated.
 // Install: npm install -g @google/gemini-cli
@@ -13,11 +10,48 @@ export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'pro';
 // Summarization is a cheap, low-reasoning task, so default it to a fast/low-cost model.
 export const GEMINI_SUMMARY_MODEL = process.env.GEMINI_SUMMARY_MODEL || 'flash';
 
-/** `gemini --output-format json` wraps the model's final answer in `{ response, stats, error }`. */
+/**
+ * npm's Windows global-install shim for a CLI is `gemini.cmd`, which plain child_process
+ * execFile/spawn can't invoke directly (spawn EINVAL/ENOENT), and `shell: true` unsafely
+ * re-splits our multi-line prompt argument on cmd.exe's quoting rules. cross-spawn resolves and
+ * invokes the shim correctly on Windows (used by npm/husky for exactly this problem) while
+ * behaving like plain child_process.spawn elsewhere.
+ */
+function runGemini(args, { cwd, timeoutMs }) {
+  return new Promise((resolve, reject) => {
+    // Belt-and-suspenders alongside the --skip-trust arg: some CLI versions still hit the
+    // trust-folder check before parsing flags, so the env var form is set too.
+    const env = { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: 'true' };
+    const child = crossSpawn('gemini', args, { cwd, env, timeout: timeoutMs });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) reject(new Error(`gemini exited with code ${code}: ${stderr || stdout}`));
+      else resolve(stdout);
+    });
+  });
+}
+
+/**
+ * `gemini --output-format json` is documented to wrap the final answer in `{ response, stats,
+ * error }`, but in practice (v0.53.1) stdout is sometimes just the raw response text directly -
+ * handle both rather than assuming the wrapper is always present.
+ */
 function parseGeminiOutput(stdout) {
-  const parsed = JSON.parse(stdout);
-  if (parsed.error) throw new Error(`gemini CLI error: ${JSON.stringify(parsed.error)}`);
-  return (parsed.response ?? '').trim();
+  const trimmed = stdout.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object' && 'response' in parsed) {
+      if (parsed.error) throw new Error(`gemini CLI error: ${JSON.stringify(parsed.error)}`);
+      return (parsed.response ?? '').trim();
+    }
+  } catch {
+    // not the documented JSON wrapper - fall through and treat stdout as the raw response
+  }
+  return trimmed;
 }
 
 /**
@@ -36,12 +70,7 @@ export async function runGeminiAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 100
     '--output-format', 'json',
   ];
 
-  const { stdout } = await execFileAsync('gemini', args, {
-    cwd,
-    maxBuffer: 1024 * 1024 * 64,
-    timeout: timeoutMs,
-    env: process.env,
-  });
+  const stdout = await runGemini(args, { cwd, timeoutMs });
   return parseGeminiOutput(stdout);
 }
 
@@ -62,11 +91,6 @@ export async function runGeminiAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000, 
     '--output-format', 'json',
   ];
 
-  const { stdout } = await execFileAsync('gemini', args, {
-    cwd,
-    maxBuffer: 1024 * 1024 * 64,
-    timeout: timeoutMs,
-    env: process.env,
-  });
+  const stdout = await runGemini(args, { cwd, timeoutMs });
   return parseGeminiOutput(stdout);
 }
