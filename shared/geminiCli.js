@@ -30,6 +30,7 @@ export async function runGeminiAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 100
   const args = [
     '-p', prompt,
     '-m', model,
+    '--skip-trust', // cwd is a throwaway ingestion checkout - no interactive session to answer the trust dialog
     '--approval-mode', 'default',
     '--allowed-tools', 'read_file,list_directory,glob,search_file_content',
     '--output-format', 'json',
@@ -55,6 +56,7 @@ export async function runGeminiAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000, 
   const args = [
     '-p', prompt,
     '-m', model,
+    '--skip-trust', // cwd is a throwaway job-scoped checkout - no interactive session to answer the trust dialog
     '--approval-mode', 'yolo',
     '--allowed-tools', 'read_file,write_file,list_directory,glob,search_file_content,replace',
     '--output-format', 'json',
