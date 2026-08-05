@@ -18085,39 +18085,37 @@
   },
   "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
     "type": "api_service",
-    "purpose": "Asynchronous workflow engine for 3D model conversion, processing, and takeoff element metadata extraction in the MEP Estimation platform (LiveCount). It downloads BIM models from Trimble Connect, processes them via TrimBim, uploads extracted JSON elements/metadata to Trimble File Service, and sends real-time updates via SignalR.",
+    "purpose": "Asynchronous workflow engine for LiveCount's 3D Quantity Takeoff feature that orchestrates BIM model conversion: downloads models from Trimble Connect, processes them via TrimBim tools to extract element metadata and PSets, uploads results to Trimble File Service, and tracks conversion lifecycles with MassTransit Sagas.",
     "techStack": [
       ".NET 10",
-      "ASP.NET Core 10 (Minimal Hosting)",
-      "MassTransit 8.5",
-      "Azure Service Bus",
+      "ASP.NET Core",
       "MongoDB",
+      "MassTransit",
+      "Azure Service Bus",
       "Azure SignalR",
-      "TrimBim.Tools.NET",
-      "TrimbleCloud.FileService",
-      "AutoMapper",
-      "Serilog",
-      "New Relic",
+      "TrimBim.Tools",
       "Azure Key Vault",
-      "Azure App Configuration"
+      "New Relic",
+      "Serilog"
     ],
     "keyModules": [
-      "StateMachines",
-      "Processors",
-      "Repositories",
-      "Services",
-      "SignalR",
-      "MassTransitFormatters"
+      "StateMachines (MassTransit Saga state machine for model conversion workflows)",
+      "Processors (Business logic orchestrators for model conversion, customer data handling, and metadata processing)",
+      "Repositories (MongoDB-backed data stores for model metadata and conversion state)",
+      "Services (Infrastructure clients for Aes/KeyVault encryption, Trimble Connect, and Trimble File Service)",
+      "SignalR (QuantityTakeoffOrchestratorHub for pushing real-time stage progress to clients)",
+      "Consumers (Message consumers for starting processes and Merlin/CDH customer data deletion)"
     ],
     "notablePatterns": [
-      "Saga State Machine pattern (MassTransit + MongoDB persistence)",
-      "Processor-Repository-Service design pattern",
-      "Real-time pub-sub status notifications via SignalR",
-      "Secure token flow using AES and RSA Key Vault encryption via message headers",
-      "Stream-based memory-efficient JSON generation and GZip compression",
-      "Customer Data Handling (CDH) compliance pattern for automated data erasure"
+      "Saga State Machine Pattern (MassTransit state machine with MongoDB persistence for tracking workflow state)",
+      "Asynchronous Message-Driven Architecture (Azure Service Bus messaging broker)",
+      "Envelope Encryption Pattern (AES and Key Vault RSA encryption for secure token handling)",
+      "Publish-Subscribe Notifications (Azure SignalR for real-time progress updates)",
+      "Customer Data Handling (CDH) Deletion Pattern (consuming CDH delete requests and publishing responses)",
+      "Repository Pattern (Clean separation of MongoDB data access from business logic)",
+      "Modular Service Registration / Extension Methods (Clean ASP.NET Core Program.cs configuration)"
     ],
-    "updatedAt": "2026-08-05T16:52:18.939Z"
+    "updatedAt": "2026-08-05T17:00:43.035Z"
   },
   "_ingestionState": {
     "Experiment-Agentic-Flow/quantitytakeoffservice": {
@@ -18126,7 +18124,7 @@
     },
     "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
       "lastSha": "2ef29ea3bd48e45af37516c5b7d0a6ef4ba46d79",
-      "updatedAt": "2026-08-05T16:52:18.954Z"
+      "updatedAt": "2026-08-05T17:00:43.053Z"
     },
     "Experiment-Agentic-Flow/mepworkspace": {
       "lastSha": "613950388f7066d1448057fe4a2142cca7edaf20",
