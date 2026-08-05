@@ -18043,45 +18043,49 @@
   },
   "Experiment-Agentic-Flow/quantitytakeoffservice": {
     "type": "api_service",
-    "purpose": "Authenticated ASP.NET Core API for managing 3D-model and manual quantity-takeoff data associated with estimates/jobs, including model versions, property-set definitions, takeoff items, merged properties, changesets, asynchronous deletion and save workflows, and real-time client notifications.",
+    "purpose": "A .NET 10 backend service designed to manage 3D building models (Trimble Connect) and extract material quantities for Mechanical, Electrical, and Plumbing (MEP) estimation, supporting automated/manual takeoff processing, changeset tracking, and async workflows with real-time progress notifications.",
     "techStack": [
-      ".NET 10 / ASP.NET Core",
+      ".NET 10",
+      "ASP.NET Core",
+      "C#",
       "MongoDB",
       "MassTransit",
       "Azure Service Bus",
       "Azure SignalR",
-      "Trimble File Service",
-      "TrimBim",
+      "Azure Key Vault",
+      "Docker",
+      "Serilog",
       "AutoMapper",
       "FluentValidation",
-      "Serilog",
       "New Relic",
-      "Swagger and ReDoc",
-      "Azure App Configuration",
-      "Azure Key Vault"
+      "ReDoc"
     ],
     "keyModules": [
-      "Controllers/v1: versioned authenticated HTTP endpoints",
-      "Processor: business orchestration and request/domain mapping",
-      "Repositories: MongoDB persistence for models, takeoff items, manual takeoffs, changesets, merged properties, and customer storage details",
-      "Models: domain, request, response, view, configuration, enum, and validation types",
-      "MassTransitConsumers: asynchronous model-processing, deletion, save, and customer-data message handlers",
-      "CourierActivities: routing-slip activities for transactional save and deletion workflows",
-      "Services: Trimble file access, encryption, data protection, MongoDB transactions, indexes, and message data storage",
-      "SignalR/QuantityTakeoffHub: grouped real-time success and failure notifications",
-      "Extensions/ServiceCustomExtensions: dependency injection, authentication, messaging, SignalR, serialization, and infrastructure setup"
+      "Controllers (v1 API endpoints)",
+      "Processors (Business logic orchestration)",
+      "Repositories (MongoDB data access)",
+      "Services (Cross-cutting features like encryption and file storage)",
+      "CourierActivities (MassTransit saga steps)",
+      "MassTransitConsumers (Async message handlers)",
+      "SignalR (Real-time hub contexts)",
+      "Extensions (DI registration and custom configurations)",
+      "Models (Domain, request, response, and validation models)",
+      "quantitytakeoffservice.UnitTests (Unit testing project)",
+      "quantitytakeoffservice.IntegrationTests (Integration testing project with Testcontainers)",
+      "quantitytakeoffservice.Test.Common (Common test fixtures and mocks)",
+      "MockDataSeeder (Development tool for seeding test data)"
     ],
     "notablePatterns": [
-      "Controllers delegate to processors, processors orchestrate repositories and services, and repositories encapsulate MongoDB access.",
-      "Customer identity is obtained from authenticated HTTP claims and used in tenant-scoped queries.",
-      "Model and takeoff deletion uses soft-delete metadata, MongoDB sessions, and transaction helpers with compensation support.",
-      "MassTransit Azure Service Bus routing slips handle long-running save and deletion workflows.",
-      "Consumers publish success or failure notifications through a unified SignalR hub using client-provided group IDs.",
-      "Takeoff publishing replaces existing takeoff records for a job before inserting the submitted batch.",
-      "API versioning, customer/license authorization policies, FluentValidation integration, CORS, rate limiting, health checks, Swagger, and ReDoc are configured in the application pipeline.",
-      "JSON uses case-insensitive property matching, original property names, and string enum serialization."
+      "Distributed Sagas (Routing Slips) via MassTransit Courier",
+      "Layered Architecture (Controllers -> Processors -> Repositories)",
+      "Multitenant Developer Isolation for Shared Message Brokers (Custom topology naming)",
+      "Real-time Push Notifications via SignalR Hubs",
+      "Soft Deletes for Data Persistence",
+      "Changeset-based Delta Tracking (Undo/Redo Support)",
+      "AES Encryption with Azure Key Vault integration",
+      "Bulk MongoDB Operations for performance"
     ],
-    "updatedAt": "2026-08-04T13:57:31.582Z"
+    "updatedAt": "2026-08-05T17:01:28.696Z"
   },
   "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
     "type": "api_service",
@@ -18119,8 +18123,8 @@
   },
   "_ingestionState": {
     "Experiment-Agentic-Flow/quantitytakeoffservice": {
-      "lastSha": "4993c84e0e09c83f9ddac358bbcec2b6287e00f2",
-      "updatedAt": "2026-08-04T13:57:31.583Z"
+      "lastSha": "62c50da6f859a509b50464171bbba645320f9e03",
+      "updatedAt": "2026-08-05T17:01:28.714Z"
     },
     "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
       "lastSha": "2ef29ea3bd48e45af37516c5b7d0a6ef4ba46d79",
