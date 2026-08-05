@@ -18,7 +18,7 @@ export function saveRepoDirectory(directory) {
 }
 
 /**
- * Dual-write target for rag-ingestion's *existing* Pinecone records (see ingestOnPush.js) - keeps
+ * Dual-write target for knowledge-ingestion's *existing* Pinecone records (see ingestOnPush.js) - keeps
  * a plain-English JSON mirror of every summary alongside the vectors, so candidate resolution can
  * also work off plain LLM judgment over this file (agent-logic/repoDirectoryLookup.js) without
  * changing anything about how the existing Pinecone ingestion itself runs. Same summaries, second
@@ -81,7 +81,7 @@ export function upsertRepoDirectoryFromRecords(repo, records, { deletedIds = [],
 }
 
 /**
- * Local, non-Pinecone replacement for rag-ingestion/ingestionState.js's bookkeeping - tracks the
+ * Local, non-Pinecone replacement for knowledge-ingestion/ingestionState.js's bookkeeping - tracks the
  * last-ingested commit SHA per repo directly in repo-directory.json instead of a Pinecone vector,
  * since Pinecone writes are currently disabled (see shared/pinecone.js). Stored under a reserved
  * `_ingestionState` top-level key, separate from real repo entries, so a `fullReplace` monorepo

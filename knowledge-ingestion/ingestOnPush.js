@@ -17,11 +17,11 @@ const ZERO_SHA = '0'.repeat(40);
  * Per-repo incremental ingestion, run by a workflow living *in the target repo itself* (not
  * agentic-hub) on every push, or manually via `workflow_dispatch`.
  * Env vars are supplied entirely by that workflow - see e.g. mepworkspace's
- * `.github/workflows/rag-ingestion.yml`.
+ * `.github/workflows/knowledge-ingestion.yml`.
  *
  * Required: REPO (org/name), REPO_TYPE ("api_service" | "monorepo"), REPO_DIR (existing checkout).
  * Optional: EVENT_NAME, BEFORE_SHA, AFTER_SHA (default: current HEAD), FORCE_FULL ("true" to force
- * a full re-ingestion regardless of diff state), RAG_INGEST_CONCURRENCY (monorepo full-baseline
+ * a full re-ingestion regardless of diff state), KNOWLEDGE_INGEST_CONCURRENCY (monorepo full-baseline
  * passes only - how many Nx projects to analyze in parallel; default 6).
  */
 function requireEnv(name) {

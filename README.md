@@ -1,13 +1,13 @@
 # agent-hub
 
-Central repository powering an autonomous AI developer system: incremental RAG ingestion of your
+Central repository powering an autonomous AI developer system: incremental knowledge ingestion of your
 organization's codebases, plus LLM coding agents that turn Jira tickets into pull requests.
 
 No agent logic lives inside your production codebases — everything is centralized here. Ingestion
 is the one exception: each target repo carries a tiny trigger-only workflow of its own so it can
-notify agentic-hub on its own pushes (see [Incremental RAG ingestion](#the-incremental-rag-ingestion-flow)
+notify agentic-hub on its own pushes (see [Incremental knowledge ingestion](#the-incremental-knowledge-ingestion-flow)
 below) — that workflow only fires a `repository_dispatch` naming the repo/commit range; it holds no
-Copilot or Pinecone credentials, and none are ever sent to it. The actual clone, analysis, and
+Gemini or Pinecone credentials, and none are ever sent to it. The actual clone, analysis, and
 vector DB writes all happen back here in agentic-hub, using agentic-hub's own secrets.
 
 ## Architecture
@@ -17,7 +17,7 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
                                                                       |
                                                     +-----------------+-----------------+
                                                     |                                   |
-                                       .github/workflows/unified-agent-runner.yml   .github/workflows/rag-ingestion-dispatch.yml
+                                       .github/workflows/unified-agent-runner.yml   .github/workflows/knowledge-ingestion-dispatch.yml
                                         (bugfix-agent.js / general-agent.js)     (repository_dispatch from a target
                                                                                     repo's own trigger-only workflow)
 ```
@@ -36,45 +36,45 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 |---|---|
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | End-to-end ticket-to-PR workflow, with an elaborated deep dive on the RAG layer: why it exists, how it's generated, what's stored, and model details. |
 | [.github/workflows/unified-agent-runner.yml](.github/workflows/unified-agent-runner.yml) | Entry point triggered by n8n via `repository_dispatch`. |
-| [.github/workflows/rag-ingestion-dispatch.yml](.github/workflows/rag-ingestion-dispatch.yml) | Entry point triggered by a target repo's own trigger-only workflow via `repository_dispatch`; does the actual clone + ingestion. |
-| [rag-ingestion/](rag-ingestion/ingestOnPush.js) | Per-push incremental ingestion entrypoint (`ingestOnPush.js`) and the summarize/embed logic it calls into. |
+| [.github/workflows/knowledge-ingestion-dispatch.yml](.github/workflows/knowledge-ingestion-dispatch.yml) | Entry point triggered by a target repo's own trigger-only workflow via `repository_dispatch`; does the actual clone + ingestion. |
+| [knowledge-ingestion/](knowledge-ingestion/ingestOnPush.js) | Per-push incremental ingestion entrypoint (`ingestOnPush.js`) and the summarize/embed logic it calls into. |
 | [agent-logic/](agent-logic/copilotAgent.js) | The LLM code-editing agents: [bugfix-agent.js](agent-logic/bugfix-agent.js) and [general-agent.js](agent-logic/general-agent.js). |
 | [shared/](shared/config.js) | Shared Pinecone / Copilot CLI clients and config used by both layers. |
 
-## The incremental RAG ingestion flow
+## The incremental knowledge ingestion flow
 
 Each target repo carries a small trigger-only workflow (e.g.
-`mepworkspace/.github/workflows/rag-ingestion.yml`) that fires on every push to its tracked branch
+`mepworkspace/.github/workflows/knowledge-ingestion.yml`) that fires on every push to its tracked branch
 (plus a manual `workflow_dispatch` for on-demand runs). That workflow does **not** run any
-Copilot/Pinecone logic itself - it just fires a `repository_dispatch` (event type `rag-ingest`) at
+Gemini/Pinecone logic itself - it just fires a `repository_dispatch` (event type `knowledge-ingest`) at
 agentic-hub with `{ repo, repo_type, event_name, before, after, force_full }`, using only a PAT
-capable of triggering that dispatch. [.github/workflows/rag-ingestion-dispatch.yml](.github/workflows/rag-ingestion-dispatch.yml)
+capable of triggering that dispatch. [.github/workflows/knowledge-ingestion-dispatch.yml](.github/workflows/knowledge-ingestion-dispatch.yml)
 receives it, checks out the target repo itself (using agentic-hub's own `ORG_GITHUB_PAT`), and runs
-`npm run ingest:push` ([rag-ingestion/ingestOnPush.js](rag-ingestion/ingestOnPush.js)) with `REPO`,
-`REPO_TYPE`, and `REPO_DIR` supplied from that payload - Copilot/Pinecone secrets only ever exist
+`npm run ingest:push` ([knowledge-ingestion/ingestOnPush.js](knowledge-ingestion/ingestOnPush.js)) with `REPO`,
+`REPO_TYPE`, and `REPO_DIR` supplied from that payload - Gemini/Pinecone secrets only ever exist
 here, in agentic-hub.
 
 1. **Work out what changed** — a push event's own `before`/`after` commits are used directly; a
    manual dispatch instead diffs against whatever commit
-   [rag-ingestion/ingestionState.js](rag-ingestion/ingestionState.js) recorded as last successfully
+   [knowledge-ingestion/ingestionState.js](knowledge-ingestion/ingestionState.js) recorded as last successfully
    ingested (a small bookkeeping vector in Pinecone, `{repo}::_ingestion-state`). If nothing
    changed, the run skips entirely.
 2. **API services** — analyzed as a whole project every time something changed
-   ([rag-ingestion/apiServiceIngestor.js](rag-ingestion/apiServiceIngestor.js)): a read-only Copilot
+   ([knowledge-ingestion/apiServiceIngestor.js](knowledge-ingestion/apiServiceIngestor.js)): a read-only Gemini
    CLI agent explores the checked-out code (README, manifest, controllers/handlers, domain models)
    and produces one factual JSON summary
-   ([rag-ingestion/summarizer.js](rag-ingestion/summarizer.js)'s `summarizeApiService`) covering the
+   ([knowledge-ingestion/summarizer.js](knowledge-ingestion/summarizer.js)'s `summarizeApiService`) covering the
    whole repo — one summary call is cheap enough that there's no benefit to diffing at file
    granularity for these.
 3. **Nx monorepos** — only the project(s) actually touched are re-analyzed
-   ([rag-ingestion/monorepoIngestor.js](rag-ingestion/monorepoIngestor.js)): every project's
+   ([knowledge-ingestion/monorepoIngestor.js](knowledge-ingestion/monorepoIngestor.js)): every project's
    `project.json` is read directly (deliberately bypassing the Nx CLI — running `npm install` +
    `npx nx graph` against an arbitrary target repo is fragile in CI: peer-dependency conflicts,
    postinstall permission issues, long install times), the diff's changed files are mapped to
    whichever project's declared root is their longest matching ancestor path, and only those
-   projects get a fresh read-only Copilot CLI pass
-   ([rag-ingestion/summarizer.js](rag-ingestion/summarizer.js)'s `summarizeMonorepoProject`) - up to
-   `RAG_INGEST_CONCURRENCY` (default 6) running in parallel, each upserted to Pinecone as soon as
+   projects get a fresh read-only Gemini CLI pass
+   ([knowledge-ingestion/summarizer.js](knowledge-ingestion/summarizer.js)'s `summarizeMonorepoProject`) - up to
+   `KNOWLEDGE_INGEST_CONCURRENCY` (default 6) running in parallel, each upserted to Pinecone as soon as
    its own summary is ready rather than waiting for every project in the batch to finish first.
    Deleted/renamed `project.json` files are detected from the diff and their old vector removed
    outright, rather than waiting for a full pass to notice they're gone.
@@ -85,7 +85,7 @@ here, in agentic-hub.
 
 A repo with no prior ingestion state yet (first run ever, or a diff that can't be computed - shallow
 history, force-push, rewritten history) falls back to a full baseline pass over every project,
-automatically, in the same `rag-ingestion-dispatch.yml` run - there's no separate backfill workflow
+automatically, in the same `knowledge-ingestion-dispatch.yml` run - there's no separate backfill workflow
 to run first.
 
 ## The agentic ticket lifecycle
@@ -140,17 +140,17 @@ to run first.
    repo-level secret/variable of the same name always takes precedence over the org-level one.
 5. `ORG_GITHUB_PAT` must be an organization-level PAT (or GitHub App installation token) with `repo` and `pull_request` scope
    across every target repository - agentic-hub's own ingestion workflow uses it to check out a target repo when a
-   `rag-ingest` dispatch arrives, and agent-logic uses it to look up a candidate repo's default branch via the GitHub API.
+   `knowledge-ingest` dispatch arrives, and agent-logic uses it to look up a candidate repo's default branch via the GitHub API.
    Each target repo also needs this same PAT (as its own `ORG_GITHUB_PAT` secret) purely to fire the `repository_dispatch`
    that notifies agentic-hub - it never sees Copilot/Pinecone credentials.
 6. Point your n8n workflow's HTTP node at
    `POST https://api.github.com/repos/<org>/agent-hub/dispatches` with `event_type: jira-ticket` and
    `client_payload: { "ticket_key": "<the Jira issue key>" }` - on every new ticket, regardless of type; agent-hub
    decides whether/how to act on it.
-7. For each repo you want RAG-ingested, add a small trigger-only workflow *in that repo* (e.g.
-   [mepworkspace's rag-ingestion.yml](../mepworkspace/.github/workflows/rag-ingestion.yml)) that fires a
+7. For each repo you want knowledge-ingested, add a small trigger-only workflow *in that repo* (e.g.
+   [mepworkspace's knowledge-ingestion.yml](../mepworkspace/.github/workflows/knowledge-ingestion.yml)) that fires a
    `repository_dispatch` at agentic-hub on push - see the
-   [incremental RAG ingestion flow](#the-incremental-rag-ingestion-flow) above for the payload shape. That workflow only
+   [incremental knowledge ingestion flow](#the-incremental-knowledge-ingestion-flow) above for the payload shape. That workflow only
    needs `ORG_GITHUB_PAT`; none of step 4's Copilot/Pinecone secrets are needed in the target repo.
 
 ## Local commands

@@ -2,9 +2,9 @@ import { getPineconeClient } from './embeddings.js';
 import { PINECONE_INDEX, EMBEDDING_DIMENSION } from './config.js';
 
 // Writes to Pinecone are switched off by default - ingestion now runs entirely against
-// data/repo-directory.json (see shared/repoDirectory.js) instead. Set RAG_PINECONE_ENABLED=true
+// data/repo-directory.json (see shared/repoDirectory.js) instead. Set KNOWLEDGE_PINECONE_ENABLED=true
 // to resume writing vectors without touching any other ingestion code.
-const PINECONE_WRITES_ENABLED = process.env.RAG_PINECONE_ENABLED === 'true';
+const PINECONE_WRITES_ENABLED = process.env.KNOWLEDGE_PINECONE_ENABLED === 'true';
 
 export async function getIndex() {
   const client = getPineconeClient();
@@ -50,7 +50,7 @@ export async function deleteRecords(ids, namespace = 'default') {
  * i.e. anything that no longer exists / wasn't re-embedded in this ingestion pass. Only valid
  * after a *full* pass over the repo (every project re-embedded) - never call this after an
  * incremental/partial run, since it would delete every project that simply wasn't touched.
- * The `_ingestion-state` tracking record (see rag-ingestion/ingestionState.js) is excluded, since
+ * The `_ingestion-state` tracking record (see knowledge-ingestion/ingestionState.js) is excluded, since
  * it's a bookkeeping vector, not ingested content.
  */
 export async function pruneStale(repo, currentRunId, namespace = 'default') {

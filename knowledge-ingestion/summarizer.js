@@ -1,4 +1,4 @@
-import { runCopilotAnalysis, COPILOT_SUMMARY_MODEL } from '../shared/copilotCli.js';
+import { runGeminiAnalysis, GEMINI_SUMMARY_MODEL } from '../shared/geminiCli.js';
 import { loadPrompt } from '../shared/promptTemplate.js';
 
 /**
@@ -11,7 +11,7 @@ import { loadPrompt } from '../shared/promptTemplate.js';
 export async function summarizeApiService({ repo, cwd }) {
   const prompt = loadPrompt('summarize-api-service', { REPO: repo });
 
-  const text = await runCopilotAnalysis(prompt, { cwd, model: COPILOT_SUMMARY_MODEL });
+  const text = await runGeminiAnalysis(prompt, { cwd, model: GEMINI_SUMMARY_MODEL });
   const jsonMatch = text.match(/\{[\s\S]*\}/);
 
   try {
@@ -36,7 +36,7 @@ export async function summarizeApiService({ repo, cwd }) {
 export async function summarizeMonorepoProject({ repo, projectName, cwd }) {
   const prompt = loadPrompt('summarize-monorepo-project', { REPO: repo, PROJECT_NAME: projectName });
 
-  const text = await runCopilotAnalysis(prompt, { cwd, model: COPILOT_SUMMARY_MODEL });
+  const text = await runGeminiAnalysis(prompt, { cwd, model: GEMINI_SUMMARY_MODEL });
   const jsonMatch = text.match(/\{[\s\S]*\}/);
 
   try {

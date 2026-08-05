@@ -6,9 +6,10 @@ const execFileAsync = promisify(execFile);
 // GitHub Copilot CLI (`copilot`) must be installed and authenticated.
 // Auth precedence: COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN, using a token with the
 // "Copilot Requests" permission. See https://github.com/github/copilot-cli
-// Bugfix/general-ticket implementation agents default to gpt-5.6-luna; override via COPILOT_MODEL.
-export const COPILOT_MODEL = process.env.COPILOT_MODEL || 'gpt-5.6-luna';
-// Summarization is a cheap, low-reasoning task, so default it to a fast/low-cost model.
+// Gemini (shared/geminiCli.js) is the default ticket-implementation provider; Copilot is a
+// global opt-in for this repo - see shared/config.js `CODING_PROVIDER` - used with Claude Sonnet 5.
+export const COPILOT_MODEL = process.env.COPILOT_MODEL || 'claude-sonnet-4.5';
+// Used only by runCopilotPrompt's plain-text repo/project relevance judgments (cheap, no tools).
 export const COPILOT_SUMMARY_MODEL = process.env.COPILOT_SUMMARY_MODEL || 'gpt-5.6-luna';
 
 /**
@@ -45,36 +46,6 @@ export async function runCopilotAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000 
     '--deny-tool=shell',
   ];
   if (COPILOT_MODEL) args.push('--model', COPILOT_MODEL);
-
-  const { stdout } = await execFileAsync('copilot', args, {
-    cwd,
-    maxBuffer: 1024 * 1024 * 64,
-    timeout: timeoutMs,
-    env: process.env,
-  });
-  return stdout.trim();
-}
-
-/**
- * Runs `copilot` as a read-only exploration agent scoped to `cwd`: it's granted the read tool so
- * it can actually open real source files (routes/handlers, domain models, configs - whatever it
- * decides is relevant), but write and shell are both denied since this is analysis only, used by
- * rag-ingestion to ground repo/project summaries in the real codebase instead of a pre-fetched
- * README/manifest snippet. Defaults to COPILOT_MODEL; callers doing high-volume summarization
- * (e.g. rag-ingestion/summarizer.js) pass `model: COPILOT_SUMMARY_MODEL` explicitly instead.
- */
-export async function runCopilotAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 1000, model = COPILOT_MODEL } = {}) {
-  const args = [
-    '-p',
-    prompt,
-    '-s',
-    '--no-ask-user',
-    '--allow-all-paths', // cwd is a throwaway ingestion checkout
-    '--allow-tool=read',
-    '--deny-tool=write',
-    '--deny-tool=shell',
-  ];
-  if (model) args.push('--model', model);
 
   const { stdout } = await execFileAsync('copilot', args, {
     cwd,

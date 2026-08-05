@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Central hub for incremental, per-repo-triggered RAG ingestion and autonomous coding agents (bugfix & general ticket implementation), triggered via Jira -> n8n -> GitHub repository_dispatch.",
+  "description": "Central hub for incremental, per-repo-triggered knowledge ingestion and autonomous coding agents (bugfix & general ticket implementation), triggered via Jira -> n8n -> GitHub repository_dispatch.",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "ingest:push": "node rag-ingestion/ingestOnPush.js",
+    "ingest:push": "node knowledge-ingestion/ingestOnPush.js",
     "agent:bugfix": "node agent-logic/bugfix-agent.js",
     "agent:general": "node agent-logic/general-agent.js"
   },

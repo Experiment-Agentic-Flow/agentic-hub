@@ -27,6 +27,9 @@ jobs:
       - name: Install GitHub Copilot CLI
         run: npm install -g @github/copilot
 
+      - name: Install Gemini CLI
+        run: npm install -g @google/gemini-cli
+
       # n8n only ever sends the ticket key - the ticket type (bugfix/general/not automated) is
       # classified entirely within agent-hub, from the Jira issue type. This step fetches the
       # ticket's summary/description and resolves its type for later steps to use.
@@ -51,6 +54,9 @@ jobs:
         working-directory: agent-hub
         run: node agent-logic/bugfix-agent.js
         env:
+          CODING_PROVIDER: ${{ vars.CODING_PROVIDER }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ vars.COPILOT_MODEL }}
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
@@ -70,6 +76,9 @@ jobs:
         working-directory: agent-hub
         run: node agent-logic/general-agent.js
         env:
+          CODING_PROVIDER: ${{ vars.CODING_PROVIDER }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ vars.COPILOT_MODEL }}
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}

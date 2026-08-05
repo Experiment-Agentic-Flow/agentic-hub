@@ -8,7 +8,7 @@ import { readFileAtRevision } from './gitDiff.js';
 
 // Each project is a separate `copilot` CLI process (tens of seconds each); with hundreds of
 // projects in a large Nx workspace, running them one at a time turns a full baseline ingest into a
-// multi-hour run. RAG_INGEST_CONCURRENCY lets that be tuned per environment.
+// multi-hour run. KNOWLEDGE_INGEST_CONCURRENCY lets that be tuned per environment.
 const DEFAULT_CONCURRENCY = 6;
 
 /** Runs `worker` over `items` with at most `limit` in flight at once, preserving result order. */
@@ -112,7 +112,7 @@ export async function ingestMonorepoProjects({ repo, repoDir, projectNames }, ru
     .map((projectName) => ({ projectName, node: nodes[projectName] }))
     .filter(({ node }) => node); // project no longer exists (moved/deleted) - nothing to re-embed
 
-  const concurrency = Number(process.env.RAG_INGEST_CONCURRENCY) || DEFAULT_CONCURRENCY;
+  const concurrency = Number(process.env.KNOWLEDGE_INGEST_CONCURRENCY) || DEFAULT_CONCURRENCY;
   let completed = 0;
   console.log(`  analyzing ${projectsToBuild.length} project(s) with concurrency=${concurrency}`);
 

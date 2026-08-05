@@ -145,56 +145,57 @@ Both consumers live in [agent-logic/contextRetrieval.js](agent-logic/contextRetr
    editing.
 
 RAG is **never** used to write code itself — it only narrows down "where" and provides background
-context. The actual code changes are always made by a real Copilot CLI coding agent
-(`runCopilotAgent`) with file read/write tools, exploring and editing the real checked-out
-repository.
+context. The actual code changes are always made by a real CLI coding agent (Gemini CLI by
+default, `runGeminiAgent`; Copilot CLI's `runCopilotAgent` when this repo's global
+[shared/config.js](shared/config.js) `CODING_PROVIDER` is set to `'copilot'`) with file read/write
+tools, exploring and editing the real checked-out repository.
 
-### How the RAG index is generated (per-repo incremental ingestion)
+### How the RAG index is generated (per-repo incremental knowledge ingestion)
 
-Entry point: [rag-ingestion/ingestOnPush.js](rag-ingestion/ingestOnPush.js), run by
-[.github/workflows/rag-ingestion-dispatch.yml](.github/workflows/rag-ingestion-dispatch.yml) in
+Entry point: [knowledge-ingestion/ingestOnPush.js](knowledge-ingestion/ingestOnPush.js), run by
+[.github/workflows/knowledge-ingestion-dispatch.yml](.github/workflows/knowledge-ingestion-dispatch.yml) in
 **agent-hub itself**. Each target repo carries a tiny trigger-only workflow of its own (e.g.
-`mepworkspace/.github/workflows/rag-ingestion.yml`) that fires on every push to its tracked branch
-(plus a manual `workflow_dispatch` for on-demand runs), but that workflow does no Copilot/Pinecone
+`mepworkspace/.github/workflows/knowledge-ingestion.yml`) that fires on every push to its tracked branch
+(plus a manual `workflow_dispatch` for on-demand runs), but that workflow does no Gemini/Pinecone
 work and holds no such credentials - it only fires a `repository_dispatch` (event type
-`rag-ingest`) at agent-hub with `{ repo, repo_type, event_name, before, after, force_full }`.
+`knowledge-ingest`) at agent-hub with `{ repo, repo_type, event_name, before, after, force_full }`.
 Agent-hub's own workflow receives it, checks out the target repo itself, and passes
 `REPO`/`REPO_TYPE`/`REPO_DIR` (and the `before`/`after` SHAs) to `ingestOnPush.js` as env vars -
-Copilot and Pinecone secrets only ever exist in agent-hub, never in a target repo.
+Gemini and Pinecone secrets only ever exist in agent-hub, never in a target repo.
 
 For each dispatch, the pipeline is:
 
 1. **Work out what changed** — a push event's own `before`/`after` commits are used directly to
    diff; a manual dispatch has no "before" of its own, so it falls back to whatever commit
-   [rag-ingestion/ingestionState.js](rag-ingestion/ingestionState.js) recorded as last successfully
+   [knowledge-ingestion/ingestionState.js](knowledge-ingestion/ingestionState.js) recorded as last successfully
    ingested (a small bookkeeping vector in Pinecone, `{repo}::_ingestion-state`,
    excluded from search/pruning via `type: "ingestion_state"`) — this is also what lets a re-run
    catch up on any push whose own ingestion run failed. If the resolved range has no actual
    changes, the run skips entirely — no agent call, no Pinecone write.
-2. **API services stay whole-project** — [rag-ingestion/apiServiceIngestor.js](rag-ingestion/apiServiceIngestor.js)'s
+2. **API services stay whole-project** — [knowledge-ingestion/apiServiceIngestor.js](knowledge-ingestion/apiServiceIngestor.js)'s
    `ingestApiServiceFromDir` re-runs one summary over the entire already-checked-out repo whenever
    anything changed. A single summary call is cheap enough that diffing at file granularity buys
    nothing here — the whole point of the incremental machinery below is to avoid unnecessary
    *agent* calls, and an API service only ever needs one.
 3. **Monorepo projects are diffed to just what changed** —
-   [rag-ingestion/monorepoIngestor.js](rag-ingestion/monorepoIngestor.js) reads every project's
+   [knowledge-ingestion/monorepoIngestor.js](knowledge-ingestion/monorepoIngestor.js) reads every project's
    `project.json` directly (still deliberately bypassing the Nx CLI, for the same CI-fragility
-   reasons as before), then [rag-ingestion/gitDiff.js](rag-ingestion/gitDiff.js)'s changed-file list
+   reasons as before), then [knowledge-ingestion/gitDiff.js](knowledge-ingestion/gitDiff.js)'s changed-file list
    is mapped to whichever project's declared root is the longest (most specific) matching ancestor
-   path — only those projects get a fresh agent pass, up to `RAG_INGEST_CONCURRENCY` (default 6) in
+   path — only those projects get a fresh agent pass, up to `KNOWLEDGE_INGEST_CONCURRENCY` (default 6) in
    parallel rather than one at a time. Deleted/renamed `project.json` files are detected from the
    diff directly (`resolveDeletedProjectIds`, reading the old blob via `git show <fromSha>:<path>`
    to resolve the project's old name) and their vector removed outright, rather than waiting for a
    full pass to notice they're gone.
 4. **Explore the real code** — for whatever needs re-analysis (the whole API service, or just the
-   affected Nx project(s)), a **read-only Copilot CLI agent**
-   ([shared/copilotCli.js](shared/copilotCli.js)'s `runCopilotAnalysis`) is pointed at the already
-   -checked-out working tree. It's granted the `read` tool (so it can actually open README/manifest/
-   controllers/domain models/config — whatever it decides is relevant) but `write` and `shell` are
-   both denied, since this is analysis only. This is deliberately the same *kind* of exploration
-   the real coding agents do, just without edit permissions — summaries are grounded in the actual
-   codebase, not just a README's claims.
-5. **Summarize into structured JSON** — [rag-ingestion/summarizer.js](rag-ingestion/summarizer.js)
+   affected Nx project(s)), a **read-only Gemini CLI agent**
+   ([shared/geminiCli.js](shared/geminiCli.js)'s `runGeminiAnalysis`) is pointed at the already
+   -checked-out working tree. It's granted read/list/search tools (so it can actually open
+   README/manifest/controllers/domain models/config — whatever it decides is relevant) but write
+   and shell tools are both denied, since this is analysis only. This is deliberately the same
+   *kind* of exploration the real coding agents do, just without edit permissions — summaries are
+   grounded in the actual codebase, not just a README's claims.
+5. **Summarize into structured JSON** — [knowledge-ingestion/summarizer.js](knowledge-ingestion/summarizer.js)
    drives that exploration with one of two prompts, both instructed to return only verifiable facts
    (`"unknown"`/`[]` rather than invented details):
    - `summarizeApiService({ repo, cwd })` → `{ purpose, techStack, keyModules, dependencies, notablePatterns }`.
@@ -206,7 +207,7 @@ For each dispatch, the pipeline is:
 7. **Upsert + record progress** — [shared/pinecone.js](shared/pinecone.js) upserts each project's
    vector + metadata under a deterministic ID as soon as that project's own summary is ready (not
    after every project in the batch finishes), deletes any vector ids resolved as
-   genuinely-removed projects, and finally [rag-ingestion/ingestionState.js](rag-ingestion/ingestionState.js)
+   genuinely-removed projects, and finally [knowledge-ingestion/ingestionState.js](knowledge-ingestion/ingestionState.js)
    records the commit just ingested so the next dispatch knows where to resume from.
 
 A repo with no prior ingestion state at all (first run ever, or a diff that can't be computed —
@@ -247,9 +248,10 @@ with or show a user — not just a bare repo name and similarity score.
 | Purpose | Model | Where configured |
 |---|---|---|
 | Embeddings (both ingestion and query time) | `llama-text-embed-v2` (Pinecone-hosted inference), 1024-dim, cosine similarity | [shared/config.js](shared/config.js) `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION`, overridable via `PINECONE_EMBEDDING_MODEL` env var |
-| Ingestion's read-only exploration/summarization agent | Same model as the coding agents by default (`COPILOT_MODEL`, `gpt-5.6-luna`) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAnalysis`, overridable per-call |
-| Coding agents (bugfix/general ticket implementation) | `COPILOT_MODEL` (`gpt-5.6-luna` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
-| (Unused elsewhere) cheap/fast fallback model | `COPILOT_SUMMARY_MODEL` (`gpt-5.6-luna` default) | Available via `runCopilotPrompt` for any future no-tool text-generation use |
+| Ingestion's read-only exploration/summarization agent | `GEMINI_SUMMARY_MODEL` (`flash` default) | [shared/geminiCli.js](shared/geminiCli.js) `runGeminiAnalysis`, overridable per-call |
+| Coding agents (bugfix/general ticket implementation), default provider | `GEMINI_MODEL` (`pro` default) | [shared/geminiCli.js](shared/geminiCli.js) `runGeminiAgent`, env var `GEMINI_MODEL` |
+| Coding agents, opt-in provider (`CODING_PROVIDER=copilot`, this repo's own env/config) | `COPILOT_MODEL` (`claude-sonnet-4.5` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
+| Repo/project relevance-judgment prompts (candidate resolution) | `COPILOT_SUMMARY_MODEL` (`gpt-5.6-luna` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotPrompt`, used by agent-logic/repoDirectoryLookup.js and agent-logic/contextRetrieval.js |
 
 **Why `llama-text-embed-v2` and not a code-specialized embedding model:** everything actually
 embedded — both the ingested summaries and the ticket descriptions used to query them — is
