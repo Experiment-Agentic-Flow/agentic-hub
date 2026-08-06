@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runAgentLoop } from './copilotAgent.js';
+import { runAgentLoop } from './agentLoop.js';
 import { createBranch, commitAndPush, hasChanges } from './git.js';
 import { openPullRequest, findExistingPullRequest } from './githubPr.js';
 import { addJiraComment } from './jira.js';

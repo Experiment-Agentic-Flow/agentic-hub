@@ -38,7 +38,7 @@ Jira (webhook) --> n8n (router) --> GitHub repository_dispatch --> agent-hub (th
 | [.github/workflows/unified-agent-runner.yml](.github/workflows/unified-agent-runner.yml) | Entry point triggered by n8n via `repository_dispatch`. |
 | [.github/workflows/knowledge-ingestion-dispatch.yml](.github/workflows/knowledge-ingestion-dispatch.yml) | Entry point triggered by a target repo's own trigger-only workflow via `repository_dispatch`; does the actual clone + ingestion. |
 | [knowledge-ingestion/](knowledge-ingestion/ingestOnPush.js) | Per-push incremental ingestion entrypoint (`ingestOnPush.js`) and the summarize/embed logic it calls into. |
-| [agent-logic/](agent-logic/copilotAgent.js) | The LLM code-editing agents: [bugfix-agent.js](agent-logic/bugfix-agent.js) and [general-agent.js](agent-logic/general-agent.js). |
+| [agent-logic/](agent-logic/agentLoop.js) | The LLM code-editing agents: [bugfix-agent.js](agent-logic/bugfix-agent.js) and [general-agent.js](agent-logic/general-agent.js). |
 | [shared/](shared/config.js) | Shared Pinecone / Copilot CLI clients and config used by both layers. |
 
 ## The incremental knowledge ingestion flow

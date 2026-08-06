@@ -4,7 +4,7 @@ import crossSpawn from 'cross-spawn';
 // Install: npm install -g @google/gemini-cli
 // Auth: set GEMINI_API_KEY (see https://aistudio.google.com/apikey).
 // This is the default provider for both knowledge-ingestion summarization (knowledge-ingestion/summarizer.js) and
-// ticket-implementation coding agents (agent-logic/copilotAgent.js) - Copilot CLI remains
+// ticket-implementation coding agents (agent-logic/agentLoop.js) - Copilot CLI remains
 // available as a global opt-in for this repo, see shared/config.js `CODING_PROVIDER`.
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'pro';
 // Summarization is a cheap, low-reasoning task, so default it to a fast/low-cost model.
