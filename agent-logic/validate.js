@@ -26,6 +26,15 @@ export async function validateChanges(workingDir) {
     });
     return { passed: true, output: `${stdout}\n${stderr}`.trim() };
   } catch (err) {
-    return { passed: false, output: `${err.stdout || ''}\n${err.stderr || err.message}`.trim() };
+    const output = `${err.stdout || ''}\n${err.stderr || err.message}`.trim();
+    // NU1101 here means restore itself failed to resolve a package (e.g. an internal
+    // Mep.Platform.*/Trimble* package only available on a private NuGet feed this CI runner isn't
+    // configured with credentials for) - not a real test failure, and not a reflection of whether
+    // the agent's change is correct, so treat it the same as the Nx "skip" case above rather than
+    // blocking every PR for these repos. Remove this once the private feed is configured in CI.
+    if (output.includes('NU1101')) {
+      return { skipped: true, reason: 'dotnet restore failed (private NuGet feed not configured in this CI environment)', output };
+    }
+    return { passed: false, output };
   }
 }

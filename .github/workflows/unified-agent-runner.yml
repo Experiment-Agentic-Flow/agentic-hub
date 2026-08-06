@@ -30,6 +30,14 @@ jobs:
       - name: Install Gemini CLI
         run: npm install -g @google/gemini-cli
 
+      # .NET repos (quantitytakeoffservice, quantitytakeofforchestratorservice) depend on private
+      # Mep.Platform.*/Trimble* NuGet packages not on nuget.org - agent-logic/validate.js currently
+      # treats a NU1101 restore failure as "skipped" rather than "failed" for exactly this reason.
+      # To get real `dotnet test` validation for these repos, add a step here configuring the
+      # private feed, e.g.:
+      #   dotnet nuget add source <feed-url> -n <name> -u <user> -p ${{ secrets.NUGET_FEED_TOKEN }} --store-password-in-clear-text
+      # (or a checked-in NuGet.Config using %NUGET_FEED_TOKEN% via nuget.config env-var expansion).
+
       # n8n only ever sends the ticket key - the ticket type (bugfix/general/not automated) is
       # classified entirely within agent-hub, from the Jira issue type. This step fetches the
       # ticket's summary/description and resolves its type for later steps to use.
