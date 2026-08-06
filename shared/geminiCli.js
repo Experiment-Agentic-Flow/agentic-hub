@@ -86,7 +86,7 @@ export async function runGeminiAnalysis(prompt, { cwd, timeoutMs = 15 * 60 * 100
  * Git/PR operations stay under our explicit control in agent-logic/git.js and
  * agent-logic/githubPr.js.
  */
-export async function runGeminiAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000, model = GEMINI_MODEL } = {}) {
+export async function runGeminiAgent(prompt, { cwd, timeoutMs = 40 * 60 * 1000, model = GEMINI_MODEL } = {}) {
   const args = [
     '-m', model,
     '--skip-trust', // cwd is a throwaway job-scoped checkout - no interactive session to answer the trust dialog

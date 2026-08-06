@@ -34,7 +34,7 @@ export async function runCopilotPrompt(prompt, { timeoutMs = 5 * 60 * 1000, mode
  * data via the network. Git/PR operations stay under our explicit control in agent-logic/git.js
  * and agent-logic/githubPr.js.
  */
-export async function runCopilotAgent(prompt, { cwd, timeoutMs = 20 * 60 * 1000 } = {}) {
+export async function runCopilotAgent(prompt, { cwd, timeoutMs = 40 * 60 * 1000 } = {}) {
   const args = [
     '-p',
     prompt,
