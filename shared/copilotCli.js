@@ -7,8 +7,9 @@ const execFileAsync = promisify(execFile);
 // Auth precedence: COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN, using a token with the
 // "Copilot Requests" permission. See https://github.com/github/copilot-cli
 // Gemini (shared/geminiCli.js) is the default ticket-implementation provider; Copilot is a
-// global opt-in for this repo - see shared/config.js `CODING_PROVIDER` - used with Claude Sonnet 5.
-export const COPILOT_MODEL = process.env.COPILOT_MODEL || 'claude-sonnet-4.5';
+// global opt-in for this repo - see shared/config.js `CODING_PROVIDER` - defaults to gpt-5.6-luna
+// to avoid burning through Claude Sonnet quota.
+export const COPILOT_MODEL = process.env.COPILOT_MODEL || 'gpt-5.6-luna';
 // Used only by runCopilotPrompt's plain-text repo/project relevance judgments (cheap, no tools).
 export const COPILOT_SUMMARY_MODEL = process.env.COPILOT_SUMMARY_MODEL || 'gpt-5.6-luna';
 

@@ -250,7 +250,7 @@ with or show a user — not just a bare repo name and similarity score.
 | Embeddings (both ingestion and query time) | `llama-text-embed-v2` (Pinecone-hosted inference), 1024-dim, cosine similarity | [shared/config.js](shared/config.js) `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION`, overridable via `PINECONE_EMBEDDING_MODEL` env var |
 | Ingestion's read-only exploration/summarization agent | `GEMINI_SUMMARY_MODEL` (`flash` default) | [shared/geminiCli.js](shared/geminiCli.js) `runGeminiAnalysis`, overridable per-call |
 | Coding agents (bugfix/general ticket implementation), default provider | `GEMINI_MODEL` (`pro` default) | [shared/geminiCli.js](shared/geminiCli.js) `runGeminiAgent`, env var `GEMINI_MODEL` |
-| Coding agents, opt-in provider (`CODING_PROVIDER=copilot`, this repo's own env/config) | `COPILOT_MODEL` (`claude-sonnet-4.5` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
+| Coding agents, opt-in provider (`CODING_PROVIDER=copilot`, this repo's own env/config) | `COPILOT_MODEL` (`gpt-5.6-luna` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotAgent`, env var `COPILOT_MODEL` |
 | Repo/project relevance-judgment prompts (candidate resolution) | `COPILOT_SUMMARY_MODEL` (`gpt-5.6-luna` default) | [shared/copilotCli.js](shared/copilotCli.js) `runCopilotPrompt`, used by agent-logic/repoDirectoryLookup.js and agent-logic/contextRetrieval.js |
 
 **Why `llama-text-embed-v2` and not a code-specialized embedding model:** everything actually

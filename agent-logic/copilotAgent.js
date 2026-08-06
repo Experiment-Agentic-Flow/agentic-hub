@@ -6,7 +6,7 @@ import { CODING_PROVIDER } from '../shared/config.js';
 /**
  * Delegates the coding task to a CLI coding agent, scoped to rootDir. The provider is a single
  * global switch for this repo - shared/config.js CODING_PROVIDER (env var CODING_PROVIDER) -
- * Gemini CLI by default, or the GitHub Copilot CLI (Claude Sonnet 5) when set to 'copilot'. Both
+ * Gemini CLI by default, or the GitHub Copilot CLI (gpt-5.6-luna) when set to 'copilot'. Both
  * CLIs have their own sandboxed file read/write tools, so there's no need to implement a custom
  * tool-use loop - we just give them the instructions and ask for a small JSON summary we can parse
  * for the commit message / PR body. `extraResponseFields` lets callers require additional keys in
