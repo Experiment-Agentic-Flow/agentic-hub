@@ -14434,37 +14434,53 @@
   },
   "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
     "type": "api_service",
-    "purpose": "Asynchronous workflow engine for LiveCount's 3D Quantity Takeoff feature that orchestrates BIM model conversion: downloads models from Trimble Connect, processes them via TrimBim tools to extract element metadata and PSets, uploads results to Trimble File Service, and tracks conversion lifecycles with MassTransit Sagas.",
+    "purpose": "The Quantity Takeoff Orchestrator Service belongs to the MEP (Mechanical, Electrical, Plumbing) Estimation domain and functions as the asynchronous workflow engine for LiveCount's 3D Quantity Takeoff feature. The service is triggered asynchronously via Azure Service Bus message contracts, where upstream components or services publish an `IProcessTrimBimModel` message to initiate the 3D model conversion pipeline. Client applications also connect directly to its Azure SignalR hub (`/quantitytakeoffhub`) to join a specific notification group and receive real-time stage-by-stage updates of the conversion progress, while the Merlin Customer Data Hub (CDH) calls it via `DeleteComponentCdhRequestMessage` to handle customer data purging for GDPR compliance. Its core capabilities include downloading and parsing TrimBim (.trb) models from Trimble Connect, extracting 3D element metadata and property set definitions (PSets) in a memory-efficient streamed manner, generating and compressing a gzipped JSON output of these elements, uploading the output files to Trimble File Service, and storing the extracted property metadata and file references into a MongoDB database. In the broader architecture, this service acts as the backend processor supporting the REST-based QuantityTakeoffService, calling out to Trimble Connect APIs, interacting with Azure Key Vault for token cryptography, integrating with Trimble File Service for storage, and publishing completion and failure events to Azure Service Bus to notify downstream consumers.",
     "techStack": [
-      ".NET 10",
-      "ASP.NET Core",
-      "MongoDB",
-      "MassTransit",
+      ".NET 10 / ASP.NET Core 10 (Minimal Hosting)",
+      "MassTransit 8.5",
       "Azure Service Bus",
-      "Azure SignalR",
-      "TrimBim.Tools",
-      "Azure Key Vault",
-      "New Relic",
-      "Serilog"
+      "MongoDB (via Mep.Platform.Extensions.MongoDb and MassTransit.MongoDb)",
+      "Azure SignalR Service (via Microsoft.Azure.SignalR)",
+      "TrimBim.Tools.NET",
+      "TrimbleCloud.FileService",
+      "Azure Key Vault (Azure.Security.KeyVault.Keys and Azure.Identity)",
+      "New Relic Agent",
+      "Serilog",
+      "AutoMapper"
     ],
     "keyModules": [
-      "StateMachines (MassTransit Saga state machine for model conversion workflows)",
-      "Processors (Business logic orchestrators for model conversion, customer data handling, and metadata processing)",
-      "Repositories (MongoDB-backed data stores for model metadata and conversion state)",
-      "Services (Infrastructure clients for Aes/KeyVault encryption, Trimble Connect, and Trimble File Service)",
-      "SignalR (QuantityTakeoffOrchestratorHub for pushing real-time stage progress to clients)",
-      "Consumers (Message consumers for starting processes and Merlin/CDH customer data deletion)"
+      "StateMachines (ModelConversionStateMachine, ModelConversionState saga state)",
+      "Consumers (ProcessTrimbleModelConsumer, DeleteCustomerDataCdhConsumer)",
+      "Processors (ModelConversionProcessor, ModelMetaDataProcessor, CustomerDataProcessor)",
+      "Repositories (ModelMetaDataRepository, ModelConversionStateRepository)",
+      "Services (TrimbleFileService, ConnectClientService, AesEncryptionService, DataProtectionService)",
+      "SignalR (QuantityTakeoffOrchestratorHub)"
+    ],
+    "dependencies": [
+      "Mep.Platform.Extensions.MongoDb",
+      "Mep.Platform.CdhBroker.MassTransit",
+      "Mep.Platform.Authorization.Middleware",
+      "Mep.Platform.Extensions.Monitoring.Serilog",
+      "TrimBim.Tools.NET",
+      "TrimbleCloud.FileService",
+      "Azure.Security.KeyVault.Keys",
+      "Azure.Identity",
+      "Microsoft.Azure.SignalR",
+      "NewRelic.Agent",
+      "MongoDB Database",
+      "Azure Service Bus Broker",
+      "Trimble Connect API",
+      "Trimble File Service"
     ],
     "notablePatterns": [
-      "Saga State Machine Pattern (MassTransit state machine with MongoDB persistence for tracking workflow state)",
-      "Asynchronous Message-Driven Architecture (Azure Service Bus messaging broker)",
-      "Envelope Encryption Pattern (AES and Key Vault RSA encryption for secure token handling)",
-      "Publish-Subscribe Notifications (Azure SignalR for real-time progress updates)",
-      "Customer Data Handling (CDH) Deletion Pattern (consuming CDH delete requests and publishing responses)",
-      "Repository Pattern (Clean separation of MongoDB data access from business logic)",
-      "Modular Service Registration / Extension Methods (Clean ASP.NET Core Program.cs configuration)"
+      "Saga State Machine Pattern (MassTransit state machine with MongoDB persistence)",
+      "Publish-Subscribe / Asynchronous Messaging (MassTransit + Azure Service Bus)",
+      "Event-Driven Real-time Updates (broadcasting state changes to groups via Azure SignalR Hub)",
+      "Repository Pattern (decoupling data persistence in MongoDB)",
+      "Processor-Repository Separation (encapsulating orchestration, business logic, and data access)",
+      "Stream-based Serialization & Compression (using FileStream and GZipStream to mitigate memory exhaustion)"
     ],
-    "updatedAt": "2026-08-05T17:00:43.035Z"
+    "updatedAt": "2026-08-11T11:26:29.077Z"
   },
   "_ingestionState": {
     "Experiment-Agentic-Flow/quantitytakeoffservice": {
@@ -14473,7 +14489,7 @@
     },
     "Experiment-Agentic-Flow/quantitytakeofforchestratorservice": {
       "lastSha": "2ef29ea3bd48e45af37516c5b7d0a6ef4ba46d79",
-      "updatedAt": "2026-08-05T17:00:43.053Z"
+      "updatedAt": "2026-08-11T11:26:29.092Z"
     },
     "Experiment-Agentic-Flow/mepworkspace": {
       "lastSha": "613950388f7066d1448057fe4a2142cca7edaf20",
