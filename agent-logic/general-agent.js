@@ -8,6 +8,7 @@ import { addJiraComment } from './jira.js';
 import { retrieveRelatedContext } from './contextRetrieval.js';
 import { gatherCandidates } from './repoCandidates.js';
 import { cloneCandidate, sanitizeRepoDirName } from './repoWorkspace.js';
+import { prepareImageAttachments, cleanupImageAttachments } from './ticketAttachments.js';
 import { validateChanges } from './validate.js';
 import { loadPrompt } from '../shared/promptTemplate.js';
 
@@ -15,12 +16,20 @@ async function main() {
   const {
     TICKET_KEY,
     TICKET_DESCRIPTION,
+    TICKET_ATTACHMENTS,
     TARGET_BRANCH,
     WORKSPACE_DIR = path.resolve('workspace'),
   } = process.env;
 
   if (!TICKET_KEY || !TICKET_DESCRIPTION) {
     throw new Error('TICKET_KEY and TICKET_DESCRIPTION are required env vars');
+  }
+
+  let attachments = [];
+  try {
+    attachments = TICKET_ATTACHMENTS ? JSON.parse(TICKET_ATTACHMENTS) : [];
+  } catch (err) {
+    console.warn(`Failed to parse TICKET_ATTACHMENTS, continuing without image attachments: ${err.message}`);
   }
 
   const branchName = `task/${TICKET_KEY.toLowerCase()}`;
@@ -92,11 +101,13 @@ async function main() {
       // it doesn't have to search the rest of the repo to find it.
       const onlyPath = candidate.paths[0];
       const scopedRoot = path.resolve(candidateDirs[chosenRepo], onlyPath);
+      const attachmentsNote = await prepareImageAttachments(attachments, scopedRoot);
       result = await runAgentLoop({
         rootDir: scopedRoot,
         systemPrompt: loadPrompt('general-single-path', { REPO: chosenRepo, PATH: onlyPath }),
-        task: `Ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${contextBlock}`,
+        task: `Ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${contextBlock}${attachmentsNote}`,
       });
+      cleanupImageAttachments(scopedRoot);
     } else {
       // Several projects inside this repo matched (or none matched a specific project) - the
       // ticket may span more than one of them, so don't hard-restrict rootDir to a single path.
@@ -106,11 +117,13 @@ async function main() {
 to only one of these, or to several of them at once (e.g. the same pattern duplicated across libs). Apply a focused
 refactor inside every path that genuinely applies, and leave unrelated parts of the repository untouched.`
         : '';
+      const attachmentsNote = await prepareImageAttachments(attachments, candidateDirs[chosenRepo]);
       result = await runAgentLoop({
         rootDir: candidateDirs[chosenRepo],
         systemPrompt: loadPrompt('general-multi-path', { REPO: chosenRepo, PATHS_BLOCK: pathsBlock }),
-        task: `Ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${contextBlock}`,
+        task: `Ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${contextBlock}${attachmentsNote}`,
       });
+      cleanupImageAttachments(candidateDirs[chosenRepo]);
     }
   } else {
     console.log(`Multiple candidate repos for ${TICKET_KEY}; letting the agent inspect and refactor wherever it applies.`);
@@ -121,11 +134,13 @@ refactor inside every path that genuinely applies, and leave unrelated parts of 
       )
       .join('\n');
 
+    const attachmentsNote = await prepareImageAttachments(attachments, WORKSPACE_DIR);
     result = await runAgentLoop({
       rootDir: WORKSPACE_DIR,
       systemPrompt: loadPrompt('general-multi-repo', { CANDIDATE_LIST: candidateList }),
-      task: `Ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}`,
+      task: `Ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${attachmentsNote}`,
     });
+    cleanupImageAttachments(WORKSPACE_DIR);
   }
 
   // Rather than trusting the agent's self-report of which repo(s) it touched, check every

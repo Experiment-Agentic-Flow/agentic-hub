@@ -99,7 +99,7 @@ to run first.
    single job (no matrix - candidate repos are gathered and cloned from inside the Node scripts, not fanned out per-repo
    at the workflow level):
    - **Fetch and classify the ticket** — [agent-logic/fetchTicket.js](agent-logic/fetchTicket.js) fetches the ticket's
-     summary/description/issue type from Jira, then [agent-logic/jira.js](agent-logic/jira.js)'s `classifyTicketType()`
+     summary/description/issue type/comments/attachments from Jira, then [agent-logic/jira.js](agent-logic/jira.js)'s `classifyTicketType()`
      maps the Jira issue type to an automation category: **"User Story Bug"** (a subtask type) → bugfix,
      anything else (`Technical Debt`, `Story`/`User Story` parent containers, `Task`, `Epic`, ...) → general ticket,
      and only a missing issue type causes the job to cleanly no-op rather than guessing.

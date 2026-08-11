@@ -7,6 +7,7 @@ import { openPullRequest, findExistingPullRequest } from './githubPr.js';
 import { addJiraComment } from './jira.js';
 import { gatherCandidates } from './repoCandidates.js';
 import { cloneCandidate, sanitizeRepoDirName } from './repoWorkspace.js';
+import { prepareImageAttachments, cleanupImageAttachments } from './ticketAttachments.js';
 import { validateChanges } from './validate.js';
 import { loadPrompt } from '../shared/promptTemplate.js';
 
@@ -14,12 +15,20 @@ async function main() {
   const {
     TICKET_KEY,
     TICKET_DESCRIPTION,
+    TICKET_ATTACHMENTS,
     TARGET_BRANCH,
     WORKSPACE_DIR = path.resolve('workspace'),
   } = process.env;
 
   if (!TICKET_KEY || !TICKET_DESCRIPTION) {
     throw new Error('TICKET_KEY and TICKET_DESCRIPTION are required env vars');
+  }
+
+  let attachments = [];
+  try {
+    attachments = TICKET_ATTACHMENTS ? JSON.parse(TICKET_ATTACHMENTS) : [];
+  } catch (err) {
+    console.warn(`Failed to parse TICKET_ATTACHMENTS, continuing without image attachments: ${err.message}`);
   }
 
   const branchName = `bugfix/${TICKET_KEY.toLowerCase()}`;
@@ -68,23 +77,28 @@ async function main() {
 
   if (candidates.length === 1) {
     const chosenRepo = candidates[0].repo;
+    const chosenDir = candidateDirs[chosenRepo];
     console.log(`Running bugfix agent for ${TICKET_KEY} on ${chosenRepo}`);
+    const attachmentsNote = await prepareImageAttachments(attachments, chosenDir);
     result = await runAgentLoop({
-      rootDir: candidateDirs[chosenRepo],
+      rootDir: chosenDir,
       systemPrompt: loadPrompt('bugfix-single-repo', { REPO: chosenRepo }),
-      task: `Bug ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}`,
+      task: `Bug ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${attachmentsNote}`,
     });
+    cleanupImageAttachments(chosenDir);
   } else {
     console.log(`Multiple candidate repos for ${TICKET_KEY}; letting the agent inspect and fix it wherever it applies.`);
     const candidateList = candidates
       .map((c) => `- ${sanitizeRepoDirName(c.repo)}/  (repo: ${c.repo}, matched via: ${c.source})`)
       .join('\n');
 
+    const attachmentsNote = await prepareImageAttachments(attachments, WORKSPACE_DIR);
     result = await runAgentLoop({
       rootDir: WORKSPACE_DIR,
       systemPrompt: loadPrompt('bugfix-multi-repo', { CANDIDATE_LIST: candidateList }),
-      task: `Bug ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}`,
+      task: `Bug ticket ${TICKET_KEY}:\n\n${TICKET_DESCRIPTION}${attachmentsNote}`,
     });
+    cleanupImageAttachments(WORKSPACE_DIR);
   }
 
   // Rather than trusting the agent's self-report of which repo(s) it touched, check every

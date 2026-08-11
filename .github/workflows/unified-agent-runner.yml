@@ -77,6 +77,7 @@ jobs:
           JIRA_API_VERSION: ${{ vars.JIRA_API_VERSION }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
           TICKET_DESCRIPTION: ${{ steps.fetch-ticket.outputs.description }}
+          TICKET_ATTACHMENTS: ${{ steps.fetch-ticket.outputs.attachments }}
           WORKSPACE_DIR: ${{ github.workspace }}/workspace
 
       - name: Run agent (non-bugfix tickets)
@@ -99,4 +100,5 @@ jobs:
           JIRA_API_VERSION: ${{ vars.JIRA_API_VERSION }}
           TICKET_KEY: ${{ github.event.client_payload.ticket_key }}
           TICKET_DESCRIPTION: ${{ steps.fetch-ticket.outputs.description }}
+          TICKET_ATTACHMENTS: ${{ steps.fetch-ticket.outputs.attachments }}
           WORKSPACE_DIR: ${{ github.workspace }}/workspace

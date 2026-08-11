@@ -15,7 +15,7 @@ Jira ticket created
 n8n forwards only { ticket_key } via repository_dispatch
         │
         ▼
-agent-logic/fetchTicket.js fetches summary/description/issue type from Jira
+agent-logic/fetchTicket.js fetches summary/description/issue type/comments/attachments from Jira
         │
         ▼
 classifyTicketType(): "User Story Bug" → bugfix   |   anything else → general ticket   |   missing issue type → no-op
@@ -46,7 +46,8 @@ agent-logic/repoCandidates.js gatherCandidates()
 ## Ticket classification and repo resolution
 
 [agent-logic/fetchTicket.js](agent-logic/fetchTicket.js) fetches the ticket's summary, description,
-and Jira issue type, then [agent-logic/jira.js](agent-logic/jira.js)'s `classifyTicketType()` maps
+Jira issue type, comments, and attachments (small plain-text attachments are inlined; everything
+else is left as a filename + link), then [agent-logic/jira.js](agent-logic/jira.js)'s `classifyTicketType()` maps
 the issue type to an automation category: **"User Story Bug"** (a subtask type) → bugfix,
 anything else (`Technical Debt`, `Story`/`User Story` parent containers, `Task`, `Epic`, ...) → general
 ticket, and only a missing issue type causes the job to cleanly no-op rather than guessing.

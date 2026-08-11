@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import axios from 'axios';
 
 // Jira Cloud uses REST API v3 (supports ADF rich-text fields); Jira Server/Data Center only ever
@@ -54,10 +56,119 @@ function adfToPlainText(node) {
   return '';
 }
 
+/** Fetches every comment on a ticket (paginated - a busy ticket can have far more than one page's worth). */
+async function fetchAllComments(auth, ticketKey) {
+  const comments = [];
+  let startAt = 0;
+  const maxResults = 100;
+
+  for (;;) {
+    const { data } = await axios.get(`${auth.baseUrl}/rest/api/${auth.apiVersion}/issue/${ticketKey}/comment`, {
+      headers: auth.headers,
+      params: { startAt, maxResults, orderBy: 'created' },
+    });
+    comments.push(...(data.comments || []));
+    if (!data.comments?.length || comments.length >= (data.total || comments.length)) break;
+    startAt += data.comments.length;
+  }
+
+  return comments.map((comment) => ({
+    author: comment.author?.displayName || comment.author?.name || 'unknown',
+    created: comment.created,
+    body: (auth.apiVersion === '3' ? adfToPlainText(comment.body) : comment.body || '').trim(),
+  }));
+}
+
+// Attachments in these formats are small enough and plain-text enough to be worth inlining
+// directly into the ticket context (e.g. a log file or stack trace attached to a bug). Images are
+// handled separately (see isImageAttachment/downloadImageAttachments below) since a coding agent
+// can visually inspect them but can't usefully read raw image bytes as text; everything else
+// (videos, archives, office docs, ...) is left as a filename + link only.
+const INLINABLE_ATTACHMENT_EXTENSIONS = ['.txt', '.log', '.md', '.json', '.csv', '.yml', '.yaml', '.xml'];
+const MAX_INLINE_ATTACHMENT_BYTES = 50 * 1024;
+
+/** Whether an attachment (as returned by fetchTicketDetails) is an image worth downloading for the coding agent to visually inspect. */
+export function isImageAttachment(attachment) {
+  return /^image\//.test(attachment.mimeType || '');
+}
+
+/** Strips path separators and other unsafe characters so a Jira-supplied filename can't escape destDir or break on any OS. */
+function sanitizeFilename(filename) {
+  return path.basename(filename || 'attachment').replace(/[^A-Za-z0-9._-]/g, '_');
+}
+
+const MAX_IMAGE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
 /**
- * Fetches a ticket's summary + description directly from Jira. n8n only forwards the ticket key
- * (not the description or ticket type), so agent-hub fetches the full ticket content itself -
- * this is also what's used as the task text given to the Copilot coding agent.
+ * Downloads every image attachment (skipping ones over MAX_IMAGE_ATTACHMENT_BYTES, re-checked
+ * against the real downloaded size since Jira's reported size can be stale/wrong) into `destDir`.
+ * Coding-agent CLIs (Gemini/Copilot) only ever get filesystem access scoped to the directory
+ * they're invoked in and have no tool to fetch a URL themselves - this is the only way for them to
+ * actually see an image rather than just being told a link exists. Best-effort per file: one bad
+ * download doesn't abort the rest. Returns [] (and creates no directory) if there's nothing to do.
+ */
+export async function downloadImageAttachments(attachments, destDir) {
+  const auth = getJiraAuth();
+  const images = (attachments || []).filter((a) => isImageAttachment(a) && a.size <= MAX_IMAGE_ATTACHMENT_BYTES);
+  if (!auth || !images.length) return [];
+
+  fs.mkdirSync(destDir, { recursive: true });
+  const saved = [];
+  for (const attachment of images) {
+    try {
+      const { data } = await axios.get(attachment.url, { headers: auth.headers, responseType: 'arraybuffer' });
+      if (data.byteLength > MAX_IMAGE_ATTACHMENT_BYTES) {
+        console.warn(`Skipping image attachment "${attachment.filename}": actual size ${data.byteLength} bytes exceeds the cap.`);
+        continue;
+      }
+      const filename = sanitizeFilename(attachment.filename);
+      fs.writeFileSync(path.join(destDir, filename), data);
+      saved.push({ filename });
+    } catch (err) {
+      console.warn(`Failed to download image attachment "${attachment.filename}": ${err.message}`);
+    }
+  }
+  return saved;
+}
+
+/** Fetches attachment metadata for a ticket, inlining small plain-text attachments' content directly. */
+async function fetchAttachments(auth, ticketKey) {
+  const issue = await getIssue(auth, ticketKey, 'attachment');
+  const attachments = issue.fields?.attachment || [];
+
+  return Promise.all(
+    attachments.map(async (attachment) => {
+      const entry = {
+        filename: attachment.filename,
+        mimeType: attachment.mimeType || 'unknown',
+        size: attachment.size || 0,
+        url: attachment.content,
+        created: attachment.created,
+      };
+
+      const isTextLike =
+        /^text\//.test(entry.mimeType) || INLINABLE_ATTACHMENT_EXTENSIONS.some((ext) => entry.filename?.toLowerCase().endsWith(ext));
+      if (isTextLike && entry.size > 0 && entry.size <= MAX_INLINE_ATTACHMENT_BYTES) {
+        try {
+          const { data } = await axios.get(entry.url, { headers: auth.headers, responseType: 'text' });
+          entry.textContent = typeof data === 'string' ? data : JSON.stringify(data);
+        } catch (err) {
+          console.warn(`Failed to download attachment "${entry.filename}" for ${ticketKey}: ${err.message}`);
+        }
+      }
+
+      return entry;
+    })
+  );
+}
+
+/**
+ * Fetches a ticket's summary + description + comments + attachments directly from Jira. n8n only
+ * forwards the ticket key (not the description or ticket type), so agent-hub fetches the full
+ * ticket content itself - this is also what's used as the task text given to the Copilot coding
+ * agent. Comments and attachments are fetched best-effort: a failure fetching either one doesn't
+ * fail the whole ticket (e.g. an attachment endpoint hiccup shouldn't block automation that only
+ * really needs the description).
  */
 export async function fetchTicketDetails(ticketKey) {
   const auth = getJiraAuth();
@@ -68,7 +179,19 @@ export async function fetchTicketDetails(ticketKey) {
   const summary = (issue.fields?.summary || '').trim();
   const description = adfToPlainText(issue.fields?.description).trim();
   const issueType = issue.fields?.issuetype?.name || null;
-  return { summary, description: description || summary, issueType };
+
+  const [comments, attachments] = await Promise.all([
+    fetchAllComments(auth, ticketKey).catch((err) => {
+      console.warn(`Failed to fetch comments for ${ticketKey}: ${err.message}`);
+      return [];
+    }),
+    fetchAttachments(auth, ticketKey).catch((err) => {
+      console.warn(`Failed to fetch attachments for ${ticketKey}: ${err.message}`);
+      return [];
+    }),
+  ]);
+
+  return { summary, description: description || summary, issueType, comments, attachments };
 }
 
 /**
