@@ -64,7 +64,7 @@ async function buildProjectRecord({ repo, projectName, node }, runId) {
   // Each project also gets its own read-only agent pass over its actual source, so it has a
   // real semantic "purpose" description to embed - not just structural tags/deps, which match
   // poorly against natural-language ticket descriptions.
-  let summary = { purpose: 'unknown', keyModules: [], notablePatterns: [] };
+  let summary = { purpose: 'unknown', keyModules: [], dependencies: [], notablePatterns: [] };
   try {
     summary = await summarizeMonorepoProject({ repo, projectName, cwd: node.projectDir });
   } catch (err) {
@@ -77,9 +77,10 @@ async function buildProjectRecord({ repo, projectName, node }, runId) {
     `Path: ${data.root || 'unknown'}`,
     `Type: ${data.projectType || 'unknown'}`,
     `Tags: ${(data.tags || []).join(', ')}`,
-    `Depends on: ${deps.map((d) => d.target || d).join(', ')}`,
+    `Depends on (declared): ${deps.map((d) => d.target || d).join(', ')}`,
     `Purpose: ${summary.purpose}`,
     `Key modules: ${(summary.keyModules || []).join(', ')}`,
+    `Dependencies (actual imports): ${(summary.dependencies || []).join(', ')}`,
     `Notable patterns: ${(summary.notablePatterns || []).join(', ')}`,
   ].join('\n');
 
@@ -96,6 +97,7 @@ async function buildProjectRecord({ repo, projectName, node }, runId) {
       dependsOn: deps.map((d) => d.target || d),
       purpose: summary.purpose || 'unknown',
       keyModules: summary.keyModules || [],
+      dependencies: summary.dependencies || [],
       notablePatterns: summary.notablePatterns || [],
       runId,
       updatedAt: new Date().toISOString(),

@@ -42,7 +42,7 @@ export async function summarizeMonorepoProject({ repo, projectName, cwd }) {
   try {
     return JSON.parse(jsonMatch ? jsonMatch[0] : text);
   } catch {
-    return { purpose: text.slice(0, 500), keyModules: [], notablePatterns: [] };
+    return { purpose: text.slice(0, 500), keyModules: [], dependencies: [], notablePatterns: [] };
   }
 }
 

@@ -49,7 +49,9 @@ async function classifyProjectsInRepo(description, projects) {
           (p, i) =>
             `${i + 1}. path: ${p.path}, purpose: ${p.purpose || 'unknown'}, keyModules: ${
               (p.keyModules || []).join(', ') || 'none'
-            }, notablePatterns: ${(p.notablePatterns || []).join(', ') || 'none'}, tags: ${(p.tags || []).join(', ') || 'none'}`
+            }, dependencies: ${(p.dependencies || []).join(', ') || 'none'}, notablePatterns: ${
+              (p.notablePatterns || []).join(', ') || 'none'
+            }, tags: ${(p.tags || []).join(', ') || 'none'}`
         )
         .join('\n');
       const indices = await judgeRelevantIndices(
